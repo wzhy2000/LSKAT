@@ -1,0 +1,21 @@
+useDynLib(LSKAT, .registration = TRUE)
+
+# functions
+export(longskat_gene_simulate)
+export(longskat_gene_plink)
+export(longskat_gene_run)
+export(longskat_est_model)
+export(print.LSKAT.null.model)
+export(print.LSKAT.gen.ret)
+export(print.LSKAT.gen.plink)
+export(summary.LSKAT.gen.plink)
+export(plot.LSKAT.gen.plink)
+export(longskat_snp_plink)
+export(longskat_snp_run)
+export(print.LSKAT.snp.ret)
+export(print.LSKAT.snp.plink)
+export(summary.LSKAT.snp.plink)
+export(plot.LSKAT.snp.plink)
+export(longskat_gene_plink_profile)
+
+
