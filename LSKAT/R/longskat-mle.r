@@ -179,6 +179,7 @@ cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n");
 
 	par_cov <- c(LR$B);
 	par_mu  <- NA;
+	par_t <- c();
 	
 	if(intercept)
 	{
@@ -192,6 +193,7 @@ cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n");
 		par_cov <- par_cov[ c(1:NCOL(y.cov))];
 	}
 
+
 	y.delt <- y.long - t( array( X %*% LR$B, dim=c(NCOL(y.long), NROW(y.long))))
 	
 	pars <- list( intercept=intercept,
@@ -204,7 +206,7 @@ cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n");
 		  	      par_cov= par_cov,  
 		  	      par_t  = par_t );
 
-	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov );
+	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov, bSuccess=T );
 	
 	class(r.model) <- "LSKAT.null.model";
 

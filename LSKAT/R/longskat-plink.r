@@ -2,15 +2,15 @@ read_gen_dataset<-function( file.set, file.bim )
 {
 	# V2: snp
 	tb.bim <- read.table(file.bim);
-	
+
 	# V2: snp
 	tb.gen <- read.table(file.set, sep=" ", header=F);
 
 	idx.tb <- match( as.character(tb.gen$V2), as.character(tb.bim$V2) )
 	idx.gen <- c(1:NROW(tb.gen)) [ !is.na(idx.tb) ]
-	
+
 	genes <- unique(tb.gen[idx.gen,1]);
-	
+
 	return(list(len=length(genes), genes=genes, snps=tb.gen[idx.gen,]));
 }
 
@@ -43,9 +43,9 @@ get_snp_plink_info<-function(idx, snp.mat, gen.tb=NA)
 
 	if (length(s.miss)>0)
 		s.mat.i <- s.mat.i[-s.miss];
-		
+
 	if ( mean(s.mat.i) > 1 ) s.mat.i <- 2 -s.mat.i;
-	snp.imp <- as.matrix( s.mat.i, dim=c(length(s.mat.i),1) ); 
+	snp.imp <- as.matrix( s.mat.i, dim=c(length(s.mat.i),1) );
 	snp.maf <- sum(snp.imp)/(length(s.mat.i)*2);
 
 	snp.map <- snp.mat$map[idx,]
@@ -56,7 +56,7 @@ get_snp_plink_info<-function(idx, snp.mat, gen.tb=NA)
 		if (length(gen.idx)>0)
 			gene.name <-  gen.tb[gen.idx[1],1];
 	}
-	
+
 	return(list(snp=snp.imp, maf=snp.maf, name=snp.map$snp.name, chr=snp.map$chromosome, loc=snp.map$position, gene=gene.name, nmiss=length(s.miss), miss=s.miss ) );
 }
 
@@ -72,7 +72,7 @@ get_snp_mat<-function(snp.mat, gen.info, snp.impute="mean")
 	snp.imp <-c();
 	snp.maf <- c();
 	snp.names <- c();
-	
+
 	for(i in 1:dim(s.mat)[2])
 	{
 		s.mat.i <- s.mat[,i] ;
@@ -98,16 +98,16 @@ get_snp_mat<-function(snp.mat, gen.info, snp.impute="mean")
 				s.mat.i[s.miss] <- r.snp;
 			}
 		}
-		
+
 		if (mean(s.mat.i)/2>0.5) s.mat.i <- 2 - s.mat.i;
-	   
+
 		snp.imp <- rbind( snp.imp, s.mat.i );
 		snp.maf <- c(snp.maf, mean(s.mat.i)/2);
 		snp.names <- c(snp.names, gen.info$snps[i]);
 	}
-	
+
 	rownames(snp.imp) <- snp.names;
-	
+
 	map <- snp.mat$map[snps, ,drop=F];
 
 	return(list(maf=snp.maf, snp=snp.imp, info=map[,c(2,1,4)]) );
@@ -121,18 +121,42 @@ colSds<-function(mat, na.rm=T)
 	return(r);
 }
 
+load_gene_plink <- function(file.plink.bed, file.plink.bim, file.plink.fam, individuals, snps, plink)
+{
+	if( !is.null(plink) )
+	{
+		tmp.file.snp <- tempfile();
+		tmp.file.ind <- tempfile();
+		tmp.file.bed <- tempfile();
+
+		tb.fam <- read.table(file.plink.fam, header=F);
+		idx.indi <- match(individuals, tb.fam[,2]);
+		write.table( tb.fam[idx.indi, c(1,2)], file=tmp.file.ind, col.names=F, row.names=F, quote=F);
+
+		write.table( snps, file=tmp.file.snp, col.names=F, row.names=F, quote=F);
+
+		cmd.plink <- paste(plink, "--bed", file.plink.bed, "--fam", file.plink.fam, "--bim", file.plink.bim, "--extract", tmp.file.snp, "--keep", tmp.file.ind, "--out", tmp.file.bed, "-make-bed");
+		system( cmd.plink, internal=T, wait=T );
+
+		snp.mat <- read.plink( paste(tmp.file.bed, "bed", sep="."), paste(tmp.file.bed, "bim", sep="."), paste(tmp.file.bed, "fam", sep=".") );
+	}
+	else
+	{
+		snp.mat <- read.plink( file.plink.bed,  file.plink.bim, file.plink.fam);
+		idx.fam <- match( individuals, snp.mat$fam$member );
+		snp.mat$genotypes<- snp.mat$genotypes[idx.fam,]
+		snp.mat$fam      <- snp.mat$fam[idx.fam,]
+	}
+
+	return(snp.mat);
+}
+
+
 read_gen_phe_cov<-function(file.plink.bed, file.plink.bim, file.plink.fam, file.phe.long, file.phe.time, file.phe.cov)
 {
 	library(snpStats);
 
-	snp.mat <- read.plink( file.plink.bed,  file.plink.bim, file.plink.fam);
-
 	phe.long <- read.csv(file.phe.long, header=T, stringsAsFactors=F, row.names=1);
-	cat("  PHE LONG =", file.phe.long, "\n");
-	cat("* Individuals =", NROW(phe.long), "\n");
-	cat("* Times =", NCOL(phe.long), "\n");
-	cat("* Mean =",  colMeans(phe.long, na.rm=T), "\n");
-	cat("* SD =",    colSds(phe.long, na.rm=T),"\n");
 	idx.na <- which( rowSums(is.na(phe.long)) == NCOL(phe.long) );
 	if( length(idx.na)>0) phe.long <- phe.long[ -idx.na, ];
 
@@ -140,25 +164,14 @@ read_gen_phe_cov<-function(file.plink.bed, file.plink.bim, file.plink.fam, file.
 	if (!is.null(file.phe.time))
 	{
 		phe.time <- read.csv(file.phe.time, header=T, stringsAsFactors=F, row.names=1);
-		cat("  PHE TIME =", file.phe.time, "\n");
-		cat("* Individuals =", NROW(phe.time), "\n");
-		cat("* Times =", NCOL(phe.time), "\n");
-		cat("* Mean =",  colMeans(phe.time, na.rm=T), "\n");
-		cat("* SD =",    colSds(phe.time, na.rm=T),"\n");
 		idx.na <- which( rowSums( is.na(phe.time))==NCOL(phe.time) );
 		if( length(idx.na)>0) phe.time <- phe.time[ -idx.na, ];
 	}
-	
+
 	phe.cov <- read.csv(file.phe.cov, header=T, stringsAsFactors=F, row.names=1);
-	cat("  PHE COV =", file.phe.cov, "\n");
-	cat("* Individuals =", NROW(phe.cov), "\n");
-	cat("* Covariate =", NCOL(phe.cov), "\n");
-	cat("* Mean =",  colMeans(phe.cov, na.rm=T), "\n");
-	cat("* SD =",    colSds(phe.cov, na.rm=T), "\n");
-	
-	ids.fam<-as.character(snp.mat$fam$member);
-	cat("  GENO FAM =", file.plink.fam, "\n");
-	cat("* Individuals =", NROW(phe.cov), "\n");
+
+	tb.fam <- read.table(file.plink.fam, header=F);
+	ids.fam <- as.character(tb.fam[,2]);
 
 	ids.phe <- intersect(rownames(phe.long), rownames(phe.cov) );
 	if(!is.null(phe.time))
@@ -166,12 +179,12 @@ read_gen_phe_cov<-function(file.plink.bed, file.plink.bim, file.plink.fam, file.
 
 	ids.set <- intersect(ids.phe, ids.fam);
 	cat("  COMMON Individuals=", length(ids.set), "\n");
-	
+
 	#eg. c(10:1)[match(c(4, 6,8,2,3), c(10:1))]
-	
+
 	idx.long <- match( ids.set, rownames(phe.long) );
 	phe.long <- phe.long[idx.long, ];
-	
+
 	idx.cov <- match( ids.set, rownames(phe.cov) );
 	phe.cov <- phe.cov[idx.cov, ];
 
@@ -183,10 +196,7 @@ read_gen_phe_cov<-function(file.plink.bed, file.plink.bim, file.plink.fam, file.
 
 	if (!all(ids.set==ids.fam) )
 	{
-		idx.fam <- match( ids.set, ids.fam );
-		snp.mat$genotypes<- snp.mat$genotypes[idx.fam,]
-		snp.mat$fam      <- snp.mat$fam[idx.fam,]
-		ids.fam <- as.character(snp.mat$fam$member);
+		idx.fam <- idx.fam[ match( ids.set, ids.fam ) ];
 
 		cat("* PLINK (", length(ids.fam) - length(ids.set), ") individuals are removed.\n");
 	}
@@ -197,11 +207,11 @@ read_gen_phe_cov<-function(file.plink.bed, file.plink.bim, file.plink.fam, file.
 	if (!( all( rownames(phe.long)==rownames(phe.cov)) && all( rownames(phe.long)==ids.fam) ) )
 		stop("! ID MATCH ERROR among 3 files( PHE.LONG, PHE.COV, PLINK.FAM). \n");
 
-	return(list(snp.mat=snp.mat, phe.long=phe.long, phe.time=phe.time, phe.cov = phe.cov));
+	return(list(snp.mat=snp.mat, phe.long=phe.long, phe.time=phe.time, phe.cov = phe.cov, member=idx.fam));
 }
 
 convert_simpe_to_plink <- function( snp.mat, snp.file.base )
-{	
+{
 	chromosome <- snp.mat[,1];
 	position <- snp.mat[,2];
 
@@ -210,7 +220,7 @@ convert_simpe_to_plink <- function( snp.mat, snp.file.base )
 
 	sub.name <- colnames(snp.mat);
 	snp.name <- rownames(snp.mat);
-	
+
 	###snps
 	dim.snps <- dim(snp.mat);
 
@@ -220,17 +230,17 @@ convert_simpe_to_plink <- function( snp.mat, snp.file.base )
 	rownames(snps) <- snp.name;
 	class(snps) <- "SnpMatrix";
 
-	r <- write.plink( file.base=snp.file.base, snp.major = F, snps=t(snps), 
-	    	id=sub.name, 
-	    	father=rep(0,dim.snps[2]), 
-	    	mother=rep(0,dim.snps[2]), 
-	    	sex=rep(0,dim.snps[2]), 
-	    	phenotype=rep(-9,dim.snps[2]), 
-			chromosome=chromosome, 
-			genetic.distance=position, 
-			position= position, 
-			allele.1 = rep("A",dim.snps[1]), 
-			allele.2 = rep("B",dim.snps[1]), 
+	r <- write.plink( file.base=snp.file.base, snp.major = F, snps=t(snps),
+	    	id=sub.name,
+	    	father=rep(0,dim.snps[2]),
+	    	mother=rep(0,dim.snps[2]),
+	    	sex=rep(0,dim.snps[2]),
+	    	phenotype=rep(-9,dim.snps[2]),
+			chromosome=chromosome,
+			genetic.distance=position,
+			position= position,
+			allele.1 = rep("A",dim.snps[1]),
+			allele.2 = rep("B",dim.snps[1]),
 			na.code=0);
 
 	cat("Genotype files have been converted into PLINK binary format(bed/bim/fam)\n");
@@ -242,11 +252,11 @@ convert_simpe_to_plink <- function( snp.mat, snp.file.base )
 
 shrink_snpmat<-function(snp.mat, gen.list, gene.range )
 {
-	snp.mat0 <- snp.mat; 
-	
+	snp.mat0 <- snp.mat;
+
 	snp.idx <- which(!is.na(match(gen.list$snps[,1], gen.list$genes[gene.range])))
 	snp.name <- unique( gen.list$snps[snp.idx,2] );
-	
+
 	snp.idx0 <- match( as.character(snp.name), as.character(snp.mat$map[,2]));
 	if (length(which(is.na(snp.idx0)))>0)
 		snp.idx0 <- snp.idx0[-which(is.na(snp.idx0))];
@@ -255,6 +265,6 @@ shrink_snpmat<-function(snp.mat, gen.list, gene.range )
 
 	snp.mat0$genotypes <- snp.mat$genotypes[, snp.idx0, drop=F ];
 	snp.mat0$map <- snp.mat$map[snp.idx0,];
-	
+
 	return( snp.mat0 );
 }
