@@ -1,3 +1,15 @@
+get_large_file_lines<-function(file.large)
+{
+	testcon <- file( file.large,open="r");
+	readsizeof <- 200000
+	nooflines <- 0
+	( while((linesread <- length(readLines(testcon,readsizeof))) > 0 ) 
+	nooflines <- nooflines+linesread )
+	close(testcon)
+	nooflines
+}
+
+
 check_plink_file<-function( file.plink.bed, file.plink.bim, file.plink.fam )
 {
 	cat("Checking PLINK file......\n");
@@ -5,33 +17,23 @@ check_plink_file<-function( file.plink.bed, file.plink.bim, file.plink.fam )
 	cat("* BIM file =", file.plink.bim, "\n");
 	cat("* FAM file =", file.plink.fam, "\n");
 
-	bigdata  <- FALSE;
-	bSuccess <- TRUE;
+	#library(snpStats);
+	#snp.mat <- try( read.plink( file.plink.bed,  file.plink.bim, file.plink.fam) );
+	#if(class(snp.mat)=="try-error")
+	#{
+	#	return(list(bSuccess=F));
+	#}
+	#n.idv <- NROW(snp.mat$fam)
+	#n.snp <- NCOL(snp.mat$genotypes)
 
-	library(snpStats);
-	snp.mat <- try( read.plink( file.plink.bed,  file.plink.bim, file.plink.fam) );
-	if(class(snp.mat)=="try-error")
-	{
-		if(all( file.exists( file.plink.bed,  file.plink.bim, file.plink.fam ) ) )
-			bigdata <- TRUE
-		else
-			bSuccess <- FALSE;
-	}
+	tb.fam <- read.table(file.plink.fam, header=F);
+	n.idv <- NROW(tb.fam);
+	n.snp <- get_large_file_lines(file.plink.bim);
 
-	if(bSuccess)
-	{
-		tb.fam <- read.table(file.plink.fam, header=F);
-		tb.bim <- read.table(file.plink.bim, header=F);
-		n.idv <- NROW(tb.fam);
-		n.snp <- NROW(tb.bim);
+	cat("* Individuals =", n.idv, "SNPs=", n.snp, "\n")
+	cat("* PLINK loading successfully.\n")
 
-		cat("* Individuals =", n.idv, "SNPs=", n.snp, "\n")
-		cat("* PLINK testing successfully.\n")
-		return(list(bSuccess=bSuccess, bigdata=bigdata, family=tb.fam[,2]));
-	}
-	else
-		return(list(bSuccess=F));
-
+	return(list(bSuccess=T));
 }
 
 # Phenotype File( CSV Format, Header=T  Comma seprated )
@@ -83,10 +85,10 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 			show(head(phe.time, n=5));
 		}
 
-		idx.inter <- intersect( phe.long[,1], phe.time[,1] );
+		idx.inter <- intersect( rownames(phe.long), rownames(phe.time) );
 		if( !( length(idx.inter)==NROW(phe.long) && length(idx.inter)==NROW(phe.time) ) )
 		{
-			cat("! PHE.LONG don't have consistent IDs with PHE.TIME.\n" );
+			cat("! PHE.LONG doesn't have consistent IDs with PHE.TIME.\n" );
 			return(list(bSuccess=F));
 		}
 	}
@@ -103,12 +105,12 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 		show(head(phe.fam, n=5));
 	}
 
-	m.phe <- match( as.character( phe.long[,1] ), phe.fam$V2  );
+	m.phe  <- match( as.character(phe.long[,1]), as.character(phe.fam$V2)  );
 	if (length(which(is.na(m.phe))) > 0 )
 	{
 		cat("!", length(which(is.na(m.phe))), "IDs can not be found in the PLINK file.\n" );
 		cat("! First 5 IDs:\n");
-		show( head(m.phe[ which(is.na(m.phe)), ], n=5) );
+		show( head(phe.long[ which(is.na(m.phe)), 1], n=5) );
 	}
 
 	m.snp <- match( as.character( phe.fam$V2) , as.character(phe.long[,1]) );
@@ -116,7 +118,7 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 	{
 		cat("!", length(which(is.na(m.snp))), " IDs can not be found in the phenotype file.\n" );
 		cat("! First 5 IDs:\n");
-		show( head( phe.fam[is.na(m.snp), ], n=5) );
+		show( head( phe.fam$V2[ which(is.na(m.snp))], n=5) );
 	}
 
 	all.na <- which( is.na( rowSums(phe.long[,-1], na.rm=T)	) )
@@ -169,7 +171,7 @@ check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
 		return(list(bSuccess=F));
 	}
 
-	m.phe <- match( as.character(phe.cov[,1]), as.character(phe.fam$V2)  );
+	m.phe  <- match( as.character(phe.cov[,1]), as.character(phe.fam$V2)  );
 	if (length(which(is.na(m.phe))) > 0 )
 	{
 		cat("!", length(which(is.na(m.phe))), "IDs, can not be found in the PLINK file.\n" );
@@ -206,7 +208,7 @@ check_geneset_file<-function( file.gene.set )
 	cat("Checking gene definition file......\n");
 	cat("* GEN.SET.FILE =", file.gene.set , "\n");
 
-	tb <- try( read.table(file.gene.set, sep=" ", header=F) );
+	tb <- try( read.table(file.gene.set, sep=" ", header=F, stringsAsFactors=F) );
 	if(class(tb)=="try-error")
 		return(list(bSuccess=F));
 

@@ -224,37 +224,29 @@ print.LSKAT.gen.ret<-function(r.lskat, useS4=FALSE)
 }
 
 #private
-longskat_gene_task<-function(r.model, gene.range, PF, gen.list, weights.common, weights.rare, run.cpp, snp.impute, rare.cutoff, test.type="Joint", debug)
+longskat_gene_task<-function( r.model, PF.gen, PF.phe, gene.range, weights.common, weights.rare, run.cpp, snp.impute, rare.cutoff, test.type="Joint", debug)
 {
 	rs.name <-c();
 	rs.lst <- vector("list", length(which(!is.na(gene.range))) );
 	rs.lst.idx <- 0;
 
-	if(debug) cat("Shrinking genotype data...\n");
-
-	snpmat <- shrink_snpmat(PF$snp.mat, gen.list, gene.range );
-	if(is.null(snpmat))
-		stop("No SNP selected from PLINK files.");
-
-	if(debug) cat("Shrinked genotype data!\n");
-
 	for(i in gene.range )
 	{
 		if (is.na(i)) next;
 
-		gen <- get_gen_group( gen.list, i );
-		if (debug) cat("  Finding", length(gen$snps), "SNPs...\n");
-
-		gen.mat <- try( get_snp_mat( snpmat, gen, snp.impute ) );
-		if( is.null(gen.mat) || class(gen.mat)=="try-error" || length(gen.mat$maf)==0 )
+		gen <- try( get_snp_mat( PF.gen, i, snp.impute ) );
+		if( is.null(gen) || class(gen)=="try-error" || length(gen$maf)==0 )
 		{
-			if (debug) cat("! No SNPS for Gene[", i, "]=", as.character(gen$name), "\n");
+			if (debug) cat("! No SNPS for Gene[", i, "]=", i, "\n");
 			next;
 		}
+		else
+			if (debug) cat("  Finding", NROW(gen$snp), "SNPs...\n");
 
-		#gen.mat$snp:[P,N]=>[N,P]
+
+		#gen$snp:[P,N]=>[N,P]
 		ls <- try( longskat_gene_run( r.model,
-						t(gen.mat$snp),
+						t(gen$snp),
 						weights.common = weights.common,
 						weights.rare   = weights.rare,
 						run.cpp        = run.cpp,
@@ -268,17 +260,17 @@ longskat_gene_task<-function(r.model, gene.range, PF, gen.list, weights.common, 
 		if(is.null(ls) || class(ls) == "try-error" )
 		{
 			rs.lst[[rs.lst.idx]] <- c( i,
-						min(gen.mat$info[,2]),
-						min(gen.mat$info[,3]),
-						NROW(gen.mat$mat),
+						min(gen$info[,2]),
+						min(gen$info[,3]),
+						NROW(gen$mat),
 						NA, NA, NA, NA, NA );
 			cat("! Failed to calculate Gene[", i, "]=", as.character(gen$name), "\n");
 		}
 		else
 		{
 			rs.lst[[rs.lst.idx]] <- c(i,
-						min(gen.mat$info[,2]),
-						min(gen.mat$info[,3]),
+						min(gen$info[,2]),
+						min(gen$info[,3]),
 						ls$snp.total,
 						ls$snp.rare,
 						ls$q.lskat,
@@ -353,12 +345,11 @@ longskat_gene_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 
 	cat( "Starting to load all data files......\n");
 
-	PF <- read_gen_phe_cov ( file.plink.bed, file.plink.bim, file.plink.fam,
-					file.phe.long,
-					file.phe.time,
-					file.phe.cov );
+	PF.gen <- read_gen_plink ( file.plink.bed, file.plink.bim, file.plink.fam, file.gene.set, options$plink.path )
 
-	PF.par <- list(file.plink.bed = file.plink.bed,
+	PF.phe <- read_phe_cov ( file.phe.long, file.phe.time, 	file.phe.cov, PF.gen );
+
+	PF.par <- list( file.plink.bed = file.plink.bed,
 					file.plink.bim = file.plink.bim,
 					file.plink.fam = file.plink.fam,
 					file.phe.long  = file.phe.long,
@@ -372,20 +363,27 @@ longskat_gene_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 					rare.cutoff    = options$rare.cutoff);
 
 	if( is.na(options$y.cov.count) )
-		options$y.cov.count <- NCOL(PF$phe.cov)-1;
+		options$y.cov.count <- NCOL(PF.phe$phe.cov)-1;
 
 	cat( "Starting to estimate the SIGMA_A, SIGMA_B, SIGMA_E and other parameters......\n");
 
-	r.model <- longskat_est_model(PF$phe.long,
-					PF$phe.cov,
-					PF$phe.time,
+	#if(!file.exists("r.model.rdata"))
+	#{
+		r.model <- longskat_est_model(PF.phe$phe.long,
+					PF.phe$phe.cov,
+					PF.phe$phe.time,
 					y.cov.time = options$y.cov.time,
 					g.maxiter  = options$g.maxiter,
-					intercept  = TRUE,
-					debug      = options$debug);
+					intercept  = options$intercept,
+					debug      = options$debug,
+					par.init   = options$par.init,
+					method     = options$est.method);
 
-	if( class(r.model) != "LSKAT.null.model" )
-		stop("! Failed to estimate the parameters of Covariance Compoment.");
+		if( class(r.model) != "LSKAT.null.model" )
+			stop("! Failed to estimate the parameters of Covariance Compoment.");
+	#	save(r.model, file="r.model.rdata");
+	#}
+	#load("r.model.rdata");
 
 	cat("* SIGMA_A =",   r.model$par$sig_a, "\n");
 	cat("* SIGMA_B =",   r.model$par$sig_b, "\n");
@@ -396,40 +394,33 @@ longskat_gene_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 	cat("* Beta(Time) =",r.model$par$par_t, "\n");
 	cat("* L(min) =",    r.model$likelihood, "\n");
 
-	gen.list <- read_gen_dataset( file.gene.set, file.plink.bim );
+	if(is.null(PF.gen$gen.list))
+		stop("! Failed to load gene definition file.");
 
 	if (is.null(gene.range))
-		gene.range<- c(1:gen.list$len)
-
-	if( length(which( gene.range > gen.list$len))>0 )
+		gene.range<- c(1:PF.gen$gen.list$len)
+	
+	if( length(which( gene.range > PF.gen$gen.list$len))>0 )
 	{
 		warning("The gene range is out of data set.");
-		gene.range <- gene.range[- which( gene.range > gen.list$len ) ];
+		gene.range <- gene.range[- which( gene.range > PF.gen$gen.list$len ) ];
 	}
 
 	cat("* GENE.RANGE =", min(gene.range),"-", max(gene.range), "[", length(gene.range), "]\n");
 
 	tm.start <- proc.time();
-	cpu.fun<-function( sect )
+	cpu.fun <- function( sect )
 	{
-		g.range0 <- gene.range[((sect-1)*n.percpu+1):(sect*n.percpu)];
-		g.range0 <- g.range0[ g.range0 <= length(gene.range) ];
+		g.range0 <- gene.range[((sect-1)*n.perjob+1):(sect*n.perjob)];
+		if ( length(gene.range) < sect*n.perjob )
+			g.range0 <- gene.range[((sect-1)*n.perjob+1):length(gene.range)];
 
-		genes <- gene.list$genes[g.range0];
-		snps  <- unique(gen.list$snps[ genes %in% gen.list$snps[,1], 2 ]);
-
-		PF$snp.mat <- load_gene_plink(
-						PF.par$file.plink.bed,
-						PF.par$file.plink.bim,
-						PF.par$file.plink.fam,
-						PF$individuals,
-						snps,
-						options$plink);
+		PF.gen.new <- clone_plink_refer(PF.gen)
 
 		res.cluster <- longskat_gene_task( r.model,
+						PF.gen.new,
+						PF.phe,
 						g.range0,
-						PF,
-						gen.list,
 						options$weights.common,
 						options$weights.rare,
 						options$run.cpp,
@@ -441,29 +432,30 @@ longskat_gene_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 		return(res.cluster);
 	}
 
-	n.perjob <- 1000;
-	n.cpujobs <- ceiling(length(gene.range)/n.perjob);
+	n.perjob <- 100;
+	n.subjob <- ceiling( length(gene.range)/100 );
 
-	res.cluster <- list();
+	lskat.ret<-c();
 	if( options$n.cpu>1 && require(snowfall) )
 	{
 		cat("Starting parallel computing, snowfall/snow......\n");
 		sfInit(parallel=TRUE, cpus=options$n.cpu, type="SOCK")
 
-		n.percpu <- ceiling( length(gene.range)/options$n.cpu );
-		sfExport("n.percpu", "gene.range", "r.model", "gen.list", "options", "PF", "PF.par" );
-
-		res.cluster <- sfClusterApplyLB( 1:n.cpujobs, cpu.fun);
+		sfExport("n.perjob", "gene.range", "r.model", "PF.gen", "PF.phe", "options", "PF.par" );
+		res.cluster <- sfClusterApplyLB( 1:n.subjob, cpu.fun);
 		sfStop();
 
 		cat("Stopping parallel computing......\n");
+
 	}
 	else
 	{
-		cat("Starting the LSKAT estimate for each gene......\n");
-		for(k in 1:n.cpujobs)
-			res.cluster[[k]] <- cpu.fun( k );
+		res.cluster <- list();
+		for(k in 1:n.subjob)
+			res.cluster[[k]] <- cpu.fun(k);
 	}
+
+	lskat.ret <- do.call("rbind", res.cluster);
 
 	tm <- proc.time() - tm.start;
 	cat( "* RUNTIME =", tm[3], "seconds \n");
@@ -582,11 +574,14 @@ get_default_options<-function()
 					g.maxiter     = 20,
 					weights.common= c(0.5,0.5),
 					weights.rare  = c(1,25),
-					run.cpp       = T,
+					run.cpp       = F,
 					debug         = F,
 					n.cpu         = 1,
 					snp.impute    = "mean",
-					test.type     = "Joint");
+					intercept     = F,
+					plink.path    = NULL,
+					test.type     = "Joint",
+					est.method    = "REML");
 
 	return(options);
 }
@@ -603,7 +598,9 @@ show_options<-function(options)
 	cat( "* Beta Weights for Rare SNPs: ",  options$weights.rare[1], options$weights.rare[2], "\n");
 	cat( "* Common-Rare cutoff:", options$rare.cutoff, "\n");
 	cat( "* Test type:", options$test.type, "\n");
-	cat( "* PLINK path:", options$plink, "\n");
+	cat( "* Intercept:", options$intercept, "\n");
+	cat( "* PLINK Path:", options$plink.path, "\n");
+	cat( "* NULL Estimate Method:", options$est.method, "\n");
 }
 
 

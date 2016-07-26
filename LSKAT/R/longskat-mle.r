@@ -16,11 +16,29 @@ Get_SKAT_Residuals.Get_X1 = function(X1){
 
 #public
 
+longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=FALSE, g.maxiter=20, par.init=list(), debug=F, method=c("REML", "ML") )
+{
+	na.idx <- which(is.na(rowSums(y.cov)));
+	if(length(na.idx)>0)
+	{
+		y.long <- y.long[-na.idx,,drop=F];
+		y.cov  <- y.cov[-na.idx,,drop=F]; 
+		if(!is.null(y.time)) y.time <- y.time[-na.idx,,drop=F];
+	}	
+
+	if(method=="REML")
+		ret <- longskat_est_REML( y.long, y.cov, y.time, y.cov.time, intercept, g.maxiter, par.init, debug )
+	else	
+		ret <- longskat_est_ML( y.long, y.cov, y.time, y.cov.time, intercept, g.maxiter, par.init, debug );
+		
+	return(ret);	
+}
+
 # y.long format:  <shareid> trait1, ..., traitN
 # y.time format: <shareid> time1, ..., timeN
 # y.cov format:  <shareid> cov1, ..., covM
 
-longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=FALSE, g.maxiter=20, par.init=list(), debug=F )
+longskat_est_REML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=FALSE, g.maxiter=20, par.init=list(), debug=F )
 {
 	# check id matched before call here!
 
@@ -33,6 +51,12 @@ longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, interc
 	
 	if( is.null(y.time))
 		y.time <- t(matrix(rep(c(1:ncol),nrow), nrow=ncol)) ;
+
+if(debug)
+{
+	cat("y.cov", "ncol=", ncol, "intercept=", intercept,  "\n");
+	show(head(y.cov));
+}
 
 	if(intercept) 
 		X <-  kronecker(cbind(1, y.cov), rep(1, ncol) )
@@ -127,6 +151,8 @@ longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, interc
 	if (is.null(par.init) || length(par.init)==0)
 		par.init <- c( 0.5, sd(y.long, na.rm=T), sd(y.long, na.rm=T), sd(y.long, na.rm=T));
 
+cat("REML parin=", par.init, "\n");
+
 	sd.ref <- sd(y.long, na.rm=T);
 	tolerance <- 1;
 	loop.n <- 0;
@@ -138,7 +164,7 @@ longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, interc
 		#r0 <- try( optim( par.init, get_par, method = "L-BFGS-B", #control=list(maxit=2500),
 		#		lower=c(0.01, rep(sd.ref/100, 3 )) ,upper=c(0.99, rep(sd.ref*10, 3) ) ), silent = F );
 
-		r0 <- try( optim( par.init, get_par, method = "BFGS", control=list(maxit=2500) ), silent = F );
+		r0 <- try( optim( par.init, get_par, method = "BFGS", control=list(maxit=5000) ), silent = F );
 
 		if (class(r0)=="try-error")
 		{
@@ -179,7 +205,7 @@ cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n");
 
 	par_cov <- c(LR$B);
 	par_mu  <- NA;
-	par_t <- c();
+	par_t   <- NA;
 	
 	if(intercept)
 	{
@@ -195,7 +221,7 @@ cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n");
 
 
 	y.delt <- y.long - t( array( X %*% LR$B, dim=c(NCOL(y.long), NROW(y.long))))
-	
+
 	pars <- list( intercept=intercept,
 				  y.cov.time = y.cov.time,
 			  	  mu     = par_mu, 
@@ -203,8 +229,8 @@ cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n");
 			  	  sig_a  = sig_a, 
 			  	  sig_b  = sig_b, 
 			  	  sig_e  = sig_e, 
-		  	      par_cov= par_cov,  
-		  	      par_t  = par_t );
+			  	  par_cov= par_cov,  
+			  	  par_t  = par_t );
 
 	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov, bSuccess=T );
 	
@@ -242,7 +268,7 @@ get_ylog_list<-function(y.long)
 	return(y.long.list)
 }
 
-longskat_est_model_LK0<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, g.maxiter=20, init.par=list(), debug=F )
+longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=TRUE, g.maxiter=20, init.par=list(), debug=F )
 {
 	# check id matched before call here!
 	
@@ -436,16 +462,16 @@ longskat_est_model_LK0<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, g.
 
 cat(par_u, par_cov, par_t, "DELT=", range(y.delt), "\n"); 
 	
-	
-	pars <- list( mu     = par_u, 
+	pars <- list( intercept = TRUE,
+				  y.cov.time = y.cov.time,
+				  mu     = par_u, 
 			  	  rho    = min.par[1], 
 			  	  sig_a  = abs(min.par[2]), 
 			  	  sig_b  = abs(min.par[3]), 
 			  	  sig_e  = abs(min.par[4]), 
 		  	      par_cov= par_cov, 
 		  	      par_t  = par_t );
-	r.model <- list(par = pars, likelihood = min.val, y.cov.time=y.cov.time, y.delt=y.delt, y.time = y.time, y.cov = y.cov );
-	
+	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov );
 	class(r.model) <- "LSKAT.null.model";
 
 	return(r.model);

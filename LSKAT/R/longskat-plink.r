@@ -1,3 +1,11 @@
+setRefClass("PLINK.refer",
+	fields = list(
+			options        = "list",
+			snp            = "list",
+			gen.list       = "list",
+			ind.list       = "list")
+);
+
 read_gen_dataset<-function( file.set, file.bim )
 {
 	# V2: snp
@@ -12,22 +20,6 @@ read_gen_dataset<-function( file.set, file.bim )
 	genes <- unique(tb.gen[idx.gen,1]);
 
 	return(list(len=length(genes), genes=genes, snps=tb.gen[idx.gen,]));
-}
-
-get_gen_group<-function(gen.list, idx)
-{
-	gen.name <- gen.list$genes[idx];
-	snp.idx <- which(gen.list$snps[,1]==gen.name);
-	return(list(name=gen.name, snps=gen.list$snps[snp.idx,2]))
-}
-
-get_gen_family<-function(gen.lib, gen.name)
-{
-	snp.idx <- which(gen.lib$snps[,1]==gen.name);
-	if (length(snp.idx)==0)
-		return(NULL)
-	else
-		return(list(name=gen.name, snps=gen.lib$snps[snp.idx,2]));
 }
 
 get_snp_plink_info<-function(idx, snp.mat, gen.tb=NA)
@@ -60,9 +52,9 @@ get_snp_plink_info<-function(idx, snp.mat, gen.tb=NA)
 	return(list(snp=snp.imp, maf=snp.maf, name=snp.map$snp.name, chr=snp.map$chromosome, loc=snp.map$position, gene=gene.name, nmiss=length(s.miss), miss=s.miss ) );
 }
 
-get_snp_mat<-function(snp.mat, gen.info, snp.impute="mean")
+get_snpstat_mat<-function(snp.mat, snps, snp.impute="mean")
 {
-	snps <- match(as.character(gen.info$snps), as.character(snp.mat$map[,2]));
+	snps <- match(as.character(snps), as.character(snp.mat$map[,2]));
 	if (length(which(is.na(snps)))>0)
 		snps <- snps[-which(is.na(snps))];
 
@@ -103,7 +95,7 @@ get_snp_mat<-function(snp.mat, gen.info, snp.impute="mean")
 
 		snp.imp <- rbind( snp.imp, s.mat.i );
 		snp.maf <- c(snp.maf, mean(s.mat.i)/2);
-		snp.names <- c(snp.names, gen.info$snps[i]);
+		snp.names <- c(snp.names, snps[i]);
 	}
 
 	rownames(snp.imp) <- snp.names;
@@ -267,4 +259,172 @@ shrink_snpmat<-function(snp.mat, gen.list, gene.range )
 	snp.mat0$map <- snp.mat$map[snp.idx0,];
 
 	return( snp.mat0 );
+}
+
+read_gen_dataset<-function( file.set, file.bim )
+{
+	# V2: snp
+	tb.bim <- read.table(file.bim);
+
+	# V2: snp
+	tb.gen <- read.table(file.set, sep=" ", header=F);
+
+	idx.tb <- match( as.character(tb.gen$V2), as.character(tb.bim$V2) )
+	idx.gen <- c(1:NROW(tb.gen)) [ !is.na(idx.tb) ]
+
+	genes <- unique(tb.gen[idx.gen,1]);
+
+	return(list(len=length(genes), genes=genes, snps=tb.gen[idx.gen,]));
+}
+
+get_gen_group<-function(gen.list, idx)
+{
+	gen.name <- gen.list$genes[idx];
+	snp.idx <- which(gen.list$snps[,1]==gen.name);
+	return(list(name=gen.name, snps=gen.list$snps[snp.idx,2]))
+}
+
+get_gen_family<-function(gen.lib, gen.name)
+{
+	snp.idx <- which(gen.lib$snps[,1]==gen.name);
+	if (length(snp.idx)==0)
+		return(NULL)
+	else
+		return(list(name=gen.name, snps=gen.lib$snps[snp.idx,2]));
+}
+
+get_gen_individuals<-function(PF.gen)
+{
+	return( as.character(PF.gen$ind.list$member[,2]) );
+}
+
+sync_gen_individuals<-function(PF.gen, ids.set)
+{
+	if (!all(ids.set == PF.gen$ind.list$member[,2]) )
+	{
+		cat("* PLINK (", NROW(PF.gen$ind.list$member) - length(ids.set), ") individuals are removed.\n");
+
+		idx.fam <- match( ids.set, PF.gen$ind.list$member[,2] );
+		if(!is.null(PF.gen$snp$matrix))
+		{
+			PF.gen$snp$matrix$genotypes<- PF.gen$snp$matrix$genotypes[idx.fam,]
+			PF.gen$snp$matrix$fam      <- PF.gen$snp$matrix$fam[idx.fam,]
+			PF.gen$ind.list$removed    <- setdiff(PF.gen$ind.list$member[,2], PF.gen$snp$matrix$fam );
+			PF.gen$ind.list$member     <- PF.gen$ind.list$member[idx.fam, ];
+		}
+		else
+		{
+			PF.gen$ind.list$removed    <- setdiff(PF.gen$ind.list$member[,2], ids.set );
+			PF.gen$ind.list$member     <- PF.gen$ind.list$member[idx.fam, ];
+		}
+	}
+
+	return(PF.gen);
+}
+
+get_snp_mat<-function( PF.gen, idx, snp.impute="mean" )
+{
+	gen.name <- PF.gen$gen.list$names[idx];
+	snps_finding <- unique(PF.gen$gen.list$snps[which(PF.gen$gen.list$snps[,1] == gen.name), 2] );
+	snp.mat <- NULL;
+
+	if(!is.null(PF.gen$snp$matrix))
+	{
+		snp.mat <- get_snpstat_mat(PF.gen$snp$matrix, snps_finding, snp.impute)
+	}
+
+	if(is.null(snp.mat))
+	{
+		idx.range <- c(idx-50, idx+50);
+		if (idx.range[1]<1) idx.range[1] <- 1
+		if (idx.range[2]>PF.gen$gen.list$len) idx.range[2] <- PF.gen$gen.list$len;
+
+		gen.names <- PF.gen$gen.list$names[idx.range[1]:idx.range[2]];
+		snps <- PF.gen$gen.list$snps[which(PF.gen$gen.list$snps[,1] %in% gen.names), 2]
+
+		PF.gen$snp$matrix<- extract_plink_data(PF.gen$options, unique(snps), PF.gen$ind.list$member);
+		snp.mat <- get_snpstat_mat(PF.gen$snp$matrix, snps_finding, snp.impute)
+	}
+
+	if(!is.null(snp.mat))
+		snp.mat$name <- gen.name;
+
+	return(snp.mat);
+}
+
+
+read_gen_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam, file.gene.set, plink.path)
+{
+	tb.gen <- read.table(file.gene.set, header=F, stringsAsFactors=F);
+	gen.names <- unique(tb.gen[,1]);
+	gen.list <- list( len=NROW(gen.names), names=gen.names, snps=tb.gen);
+
+	tb.fam <- read.table(file.plink.fam, header=F, stringsAsFactors=F);
+	ind.list <- list( member=tb.fam[,c(1,2)], removed=c() )
+
+ 	n.snp <- get_large_file_lines( file.plink.bim);
+
+	snp <- list()
+	snp$fam <- as.data.frame(tb.fam);
+	options <- list( plink.path=plink.path, file.plink.bed=file.plink.bed,  file.plink.bim=file.plink.bim, file.plink.fam=file.plink.fam );
+
+	if( n.snp * 1.0 * NROW(tb.fam) < 50*1000*2000 )
+	{
+		library(snpStats);
+		snp$matrix <- snpStats::read.plink( file.plink.bed,  file.plink.bim, file.plink.fam );
+	}
+	else
+	{
+		snp$matrix <- NULL;
+	}
+	PLINK.refer <- getRefClass("PLINK.refer");
+	PF.gen <- PLINK.refer(gen.list=gen.list, ind.list=ind.list, snp=snp, options=options);
+
+	return(PF.gen);
+}
+
+
+extract_plink_data<-function(options, snps, individuals)
+{
+	tmp <- tempfile( tmpdir = getwd() );
+	tmp.bed <- paste(tmp, "bed", sep=".");
+	tmp.bim <- paste(tmp, "bim", sep=".");
+	tmp.fam <- paste(tmp, "fam", sep=".");
+	tmp.all <- paste(tmp, "*", sep=".");
+
+	file.snps <- tempfile(tmpdir = getwd() );
+	file.member <- tempfile(tmpdir = getwd() );
+
+cat("SNPS=", length(snps), "SAMPLE=", NROW(individuals), "\n")
+
+	write.table(snps, file=file.snps, quote=F, row.names=F, col.names=F, sep="\t");
+	write.table(individuals, file=file.member, quote=F, row.names=F, col.names=F, sep="\t");
+
+	plink.cmd <- paste(options$plink.path, "--bed",  options$file.plink.bed, "--bim",  options$file.plink.bim, "--fam",  options$file.plink.fam, "--extract", file.snps, "--keep", file.member, "--make-bed", "--out", tmp, sep=" ");
+cat(plink.cmd, "\n");
+	plink.status <- system(plink.cmd, wait=T, intern=T);
+
+#show(plink.status);
+
+	library(snpStats);
+	snp.mat <- snpStats::read.plink( tmp.bed,  tmp.bim, tmp.fam );
+
+	idx.fam <- match(individuals[,2], snp.mat$fam$member)
+	snp.mat$fam$member <- snp.mat$fam$member[idx.fam];
+	snp.mat$genotypes <- snp.mat$genotypes[idx.fam, ];
+
+	unlink(c(tmp.all, tmp.bed,  tmp.bim, tmp.fam, file.member, file.snps));
+
+	return(snp.mat);
+}
+
+clone_plink_refer<-function(PF.gen)
+{
+	PLINK.refer <- getRefClass("PLINK.refer");
+	PF.gen2 <- PLINK.refer(
+				gen.list=PF.gen$gen.list,
+				ind.list=PF.gen$ind.list,
+				snp=list(fam=PF.gen$snp$fam),
+				options=PF.gen$options);
+	return(PF.gen2);
 }
