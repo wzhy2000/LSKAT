@@ -266,7 +266,7 @@ check.type1err<-function( par, n.loop, n.rep, n.sample, f.simu, ncores=1)
 	
 	colnames(rs)<-c("i","j", "sample","times","p.lskat", "p.burden", "snp","rare", "sig_a", "sig_b","sig_e", "rho", "mu", "a", "b", "LR")
 	
-	save(rs, file=paste("simu-type1-", "0.rdata", sep="") );
+	#save(rs, file=paste("simu-type1-", "0.rdata", sep="") );
 	
 	return(rs);
 }
