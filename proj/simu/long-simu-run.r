@@ -278,6 +278,9 @@ check.power<-function( par, n.loop, n.sample, f.simu, ncores=1 )
 	rs <- mclapply(1:n.loop, function(i)
 	{
 		rlist <- c();
+
+		while(length(rlist)==0)
+		{
 		phe <- simu.long.phe.power( n.sample, snp.mat[[i]], par, f.simu);
 
 		if(par$intercept) 
@@ -290,7 +293,7 @@ check.power<-function( par, n.loop, n.sample, f.simu, ncores=1 )
 cat("formula=", model, "\n");
 
 		y.phe <- cbind(subjects=seq(1, n.sample), phe$cov, Y=phe$y );
-        y.df <- c();
+        	y.df <- c();
 
 		if(!is.null(par$y.cov.time) && par$y.cov.time>0)
 		{		
@@ -305,14 +308,16 @@ cat("formula=", model, "\n");
 			colnames(y.df) <- c("subjects", "X1", "X2", "Y", "time");	
 		}
 
-        y.df <- as.data.frame(y.df);
-        
-	    #ylm <- try ( lme(as.formula(model), random = ~ time| subjects + 1 | subjects,  correlation = corAR1(),  data=y.df) )
-	    ylm <- try ( lme(as.formula(model), random = ~ time| subjects,  correlation = corAR1(),  data=y.df) )
+        	y.df <- as.data.frame(y.df);
+		#ylm <- try ( lme(as.formula(model), random = ~ time| subjects + 1 | subjects,  correlation = corAR1(),  data=y.df) )
+		ylm <- try ( lme(as.formula(model), random = ~ time| subjects,  correlation = corAR1(),  data=y.df) )
 		if( class(ylm)!="try-error" )
-			cat("***LME =", round(ylm$coefficients$fixed,3) , "\n");
-		
-		obj.h0 <- try( longskat_est_model( phe$y, phe$cov, y.cov.time=par$y.cov.time, g.maxiter=1, intercept=par$intercept ));
+			cat("***LME =", round(ylm$coefficients$fixed,3) , "\n")
+		else
+			cat("***LME =Unavalaible.\n");
+
+        
+		obj.h0 <- try( longskat_est_model( phe$y, phe$cov, y.cov.time=par$y.cov.time, g.maxiter=1, intercept=par$intercept, method="ML" ));
 
 		if(class(obj.h0) != "try-error" && obj.h0$bSuccess )
 			rlist <- c( n.sample, obj.h0$par$sig_a, obj.h0$par$sig_b, obj.h0$par$sig_e, 
@@ -322,6 +327,7 @@ cat("formula=", model, "\n");
 						obj.h0$likelihood)
 		else
 			next; 
+		}
 
 		# LSKAT--gene 
 		r.lskat <- try( longskat_gene_run( obj.h0, snp.mat[[i]], 
