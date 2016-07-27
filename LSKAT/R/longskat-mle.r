@@ -18,6 +18,9 @@ Get_SKAT_Residuals.Get_X1 = function(X1){
 
 longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=FALSE, g.maxiter=20, par.init=list(), debug=F, method=c("REML", "ML") )
 {
+	if(missing(method)) method <- "REML";
+	if(missing(debug)) debug <- F;
+
 	na.idx <- which(is.na(rowSums(y.cov)));
 	if(length(na.idx)>0)
 	{
