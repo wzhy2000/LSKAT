@@ -305,11 +305,13 @@ cat("formula=", model, "\n");
 	    #ylm <- try ( lme(as.formula(model), random = ~ time| subjects + 1 | subjects,  correlation = corAR1(),  data=y.df) )
 	    ylm <- try ( lme(as.formula(model), random = ~ time| subjects,  correlation = corAR1(),  data=y.df) )
 		if( class(ylm)!="try-error" )
-			cat("***LME =", round(ylm$coefficients$fixed,3) , "\n");
-		
-		obj.h0 <- try( longskat_est_model( phe$y, phe$cov, y.cov.time=par$y.cov.time, g.maxiter=1, intercept=par$intercept ));
+			cat("***LME =", round(ylm$coefficients$fixed,3) , "\n")
+		else
+			cat("***LME =Unavalaible.\n");
 
-		if(class(obj.h0) != "try-error")
+		obj.h0 <- try( longskat_est_model( phe$y, phe$cov, y.cov.time=par$y.cov.time, g.maxiter=1, intercept=par$intercept, method="REML" ));
+
+		if(class(obj.h0) != "try-error"  && obj.h0$bSuccess)
 			rlist <- c( n.sample, obj.h0$par$sig_a, obj.h0$par$sig_b, obj.h0$par$sig_e, 
 						obj.h0$par$rho,  
 						obj.h0$par$mu, 

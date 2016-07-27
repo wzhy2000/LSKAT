@@ -1,6 +1,6 @@
 source("long-simu-test-rare2.r");
 
-if(!exists("ncores")) ncores<-1;
+if(!exists("ncores")) ncores<-16;
 
 par <- list(
 	test.type   = "Joint",
@@ -25,48 +25,48 @@ par <- list(
 	# 2015 test: rare.c1=0.08, common.c1=0.12, max.rare.causal=10, max.common.causal=4,
 	rare.count.range = c(30, 32),
 	common.count.range = c(14, 16),
-	rare.c1     = 0.08,
-	common.c1   = 0.12,
-	max.rare.causal = 30/3,
-	max.common.causal = 12/3,
+	rare.c1     = 0.08/3,
+	common.c1   = 0.12/3,
+	max.rare.causal = 30,
+	max.common.causal = 12,
     positive.effect = 1,
 	rare.cutoff = 0.05 );
 
-n.loop <- 200;
+n.loop <- 800;
 n.rep <- 1
 
-testR( 1, par, "power.L1.200.rare.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L1.200.rare.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L1.200.rare.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L1.1k.rare.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L1.1k.rare.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L1.1k.rare.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
 
 par$sig_a <- 0.2
 par$sig_b <- 0.8
 par$sig_e <- 0.2
-testR( 1, par, "power.L4.1k.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L4.1k.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L4.1k.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L4.1k.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L4.1k.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L4.1k.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
 
 par$sig_a <- 0.8
 par$sig_b <- 0.2
 par$sig_e <- 0.8
-testR( 1, par, "power.L5.1k.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L5.1k.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L5.1k.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L5.1k.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L5.1k.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L5.1k.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
 
 
 par$sig_a <- 0.8
 par$sig_b <- 0.8
 par$sig_e <- 0.8
-testR( 1, par, "power.L12.1k.mn.sad.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "sad", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L12.1k.mn.sad.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "sad", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L12.1k.mn.sad.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "sad", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L12.1k.mn.sad.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "sad", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L12.1k.mn.sad.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "sad", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L12.1k.mn.sad.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "sad", nloop = n.loop, nrep = n.rep, ncores = ncores);
 
 
 par$sig_a <- 0.8
 par$sig_b <- 0.8
 par$sig_e <- 0.8
-testR( 1, par, "power.L14.1k.mn.cm.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L14.1k.mn.cm.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L14.1k.mn.cm.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
+#testR( 1, par, "power.L14.1k.mn.cm.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
 testR( 1, par, "power.L14.1k.mn.cm.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
 
 
