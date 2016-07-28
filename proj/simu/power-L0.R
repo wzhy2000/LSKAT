@@ -1,4 +1,5 @@
 source("long-simu-test-rare2.r");
+source("test-nocorrelation.R")
 
 ncores<-16;
 
@@ -28,12 +29,11 @@ par <- list(
     rare.effect = 1,
 	rare.cutoff = 0.05 );	
 
-par$sig_b <- 0;
-par$rho <- 0;
-n.rep <- 1
+n.rep <- 1000;
 n.loop <- 200;
  
-testR( 1, par, "power.L0.1k.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L0.1k.mn.ar1.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
-testR( 1, par, "power.L0.1k.mn.ar1.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+testR( 1, par, "power.L0.1k.mn.ar1.1000.pp1.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+testR( 1, par, "power.L0.1k.mn.ar1.500.pp1.rdata", nsample = 500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+testR( 1, par, "power.L0.1k.mn.ar1.2500.pp1.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
+
 

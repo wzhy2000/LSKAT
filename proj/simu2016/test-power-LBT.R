@@ -32,7 +32,7 @@ par <- list(
     positive.effect = 1,
 	rare.cutoff = 0.05 );
 
-n.loop <- 800;
+n.loop <- 200;
 n.rep <- 1
 
 #testR( 1, par, "power.L1.1k.rare.mn.ar1.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "ar1", nloop = n.loop, nrep = n.rep, ncores = ncores);
@@ -65,11 +65,9 @@ par$sig_e <- 0.8
 par$sig_a <- 0.8
 par$sig_b <- 0.8
 par$sig_e <- 0.8
-#testR( 1, par, "power.L14.1k.mn.cm.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
-#testR( 1, par, "power.L14.1k.mn.cm.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
+testR( 1, par, "power.L14.1k.mn.cm.500.rdata",  nsample =  500, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
+testR( 1, par, "power.L14.1k.mn.cm.1000.rdata", nsample = 1000, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
 testR( 1, par, "power.L14.1k.mn.cm.2500.rdata", nsample = 2500, phe.dist = "mn", phe.cov  = "cm", nloop = n.loop, nrep = n.rep, ncores = ncores);
-
-
 
 
 if(0)

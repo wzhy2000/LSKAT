@@ -105,15 +105,15 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 		show(head(phe.fam, n=5));
 	}
 
-	m.phe  <- match( as.character(phe.long[,1]), as.character(phe.fam$V2)  );
+	m.phe  <- match( rownames(phe.long), as.character(phe.fam$V2)  );
 	if (length(which(is.na(m.phe))) > 0 )
 	{
 		cat("!", length(which(is.na(m.phe))), "IDs can not be found in the PLINK file.\n" );
 		cat("! First 5 IDs:\n");
-		show( head(phe.long[ which(is.na(m.phe)), 1], n=5) );
+		show( head(rownames(phe.long[ which(is.na(m.phe)), ]), n=5) );
 	}
 
-	m.snp <- match( as.character( phe.fam$V2) , as.character(phe.long[,1]) );
+	m.snp <- match( as.character( phe.fam$V2) , rownames(phe.long) );
 	if (length(which(is.na(m.snp))) > 0 )
 	{
 		cat("!", length(which(is.na(m.snp))), " IDs can not be found in the phenotype file.\n" );
@@ -121,7 +121,7 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 		show( head( phe.fam$V2[ which(is.na(m.snp))], n=5) );
 	}
 
-	all.na <- which( is.na( rowSums(phe.long[,-1], na.rm=T)	) )
+	all.na <- which( is.na( rowSums(phe.long, na.rm=T)	) )
 	if (length(all.na)>0 )
 	{
 		cat("!", length(all.na), "IDs dont have non-missing data.\n" );
@@ -171,7 +171,7 @@ check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
 		return(list(bSuccess=F));
 	}
 
-	m.phe  <- match( as.character(phe.cov[,1]), as.character(phe.fam$V2)  );
+	m.phe  <- match( rownames(phe.cov), as.character(phe.fam$V2)  );
 	if (length(which(is.na(m.phe))) > 0 )
 	{
 		cat("!", length(which(is.na(m.phe))), "IDs, can not be found in the PLINK file.\n" );
@@ -179,7 +179,7 @@ check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
 		show( head(phe.cov[is.na(m.phe), ], n=5 ) );
 	}
 
-	m.snp <- match( as.character(phe.fam$V2) , as.character(phe.cov[,1]) );
+	m.snp <- match( as.character(phe.fam$V2) , rownames(phe.cov) );
 	if (length(which(is.na(m.snp))) > 0 )
 	{
 		cat("!", length(which(is.na(m.snp))), "IDs, can not be found in the phenotype file.\n" );
@@ -187,7 +187,7 @@ check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
 		show( head(phe.fam[is.na(m.snp), ], n=5 ) );
 	}
 
-	all.na <- which( is.na( rowSums(phe.cov[,-1], na.rm=T)	) )
+	all.na <- which( is.na( rowSums(phe.cov, na.rm=T)	) )
 	if (length(all.na)>0 )
 	{
 		cat("!", length(all.na), "IDs dont have non-missing data.\n" );
