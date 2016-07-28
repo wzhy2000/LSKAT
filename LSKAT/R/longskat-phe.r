@@ -39,15 +39,15 @@ read_phe_cov<-function( file.phe.long, file.phe.time, file.phe.cov, PF.gen)
 	#eg. c(10:1)[match(c(4, 6,8,2,3), c(10:1))]
 
 	idx.long <- match( ids.set, rownames(phe.long) );
-	phe.long <- phe.long[idx.long, ];
+	phe.long <- phe.long[idx.long, ,drop=F];
 
 	idx.cov <- match( ids.set, rownames(phe.cov) );
-	phe.cov <- phe.cov[idx.cov, ];
+	phe.cov <- phe.cov[idx.cov, , drop=F];
 
 	if(!is.null(phe.time))
 	{
 		idx.time <- match( ids.set, rownames(phe.time) );
-		phe.time <- phe.time[idx.time, ];
+		phe.time <- phe.time[idx.time, ,drop=F];
 	}
 
 	sync_gen_individuals(PF.gen, ids.set)
