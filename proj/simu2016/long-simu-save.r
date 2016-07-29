@@ -245,6 +245,7 @@ check_power0_ret<-function( simu.folder, simu.rdata)
 		p.2.2500 <- r.2; snp1<-c(snp1, mean(p.2.2500[,"lskat.snp.total"])); rare1<-c(rare1, mean(p.2.2500[,"lskat.snp.rare"]));
 		p.3.2500 <- r.3; snp1<-c(snp1, mean(p.3.2500[,"lskat.snp.total"])); rare1<-c(rare1, mean(p.3.2500[,"lskat.snp.rare"]));
 
+		r.power <- c();
 		r.power<-rbind( r.power, c(500*5, 100, length(which(r.1[,13]<a.level)),
 										     length(which(r.1[,14]<a.level)),
 										     length(which(r.1[,18]<a.level)),
