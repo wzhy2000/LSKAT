@@ -62,26 +62,29 @@ bar.subplot<-function(p.dat, ylim=c(0, 1.1), letter, test.no=0, legend=F,xlab=F,
 	}
 }
 
-load.lskat.ret <- function(test.no, data.folder="./", loops=100)
+load.lskat.ret <- function(rdata.prefix, data.folder="./" )
 {
-	load( paste( data.folder, simu.rdata[test.no],  ".",  500, ".rdata", sep="") )
+	load( paste( data.folder, rdata.prefix,  ".",  500, ".rdata", sep="") )
+	r.power6[,c(3:9)] <- r.power6[, c(3:9)]/NROW(r.1);
 	r.power0 <- r.power6;
-	load( paste( data.folder, simu.rdata[test.no],  ".", 1000, ".rdata", sep="") );
+	load( paste( data.folder, rdata.prefix,  ".", 1000, ".rdata", sep="") );
+	r.power6[,c(3:9)] <- r.power6[, c(3:9)]/NROW(r.1);
 	r.power0 <- rbind( r.power0, r.power6) ;
-	load( paste( data.folder, simu.rdata[test.no],  ".", 2500, ".rdata", sep="") );
+	load( paste( data.folder, rdata.prefix,  ".", 2500, ".rdata", sep="") );
+	r.power6[,c(3:9)] <- r.power6[, c(3:9)]/NROW(r.1);
 	r.power0 <- rbind( r.power0, r.power6);
 
 	pp1<- r.power0[which(r.power0[,2]==1), c(6,7,8,9,3,4)];
-	pp1<- t(pp1/loops);
+	pp1<- t(pp1);
 	pp2<- r.power0[which(r.power0[,2]==2), c(6,7,8,9,3,4)];
-	pp2<- t(pp2/loops);
+	pp2<- t(pp2);
 	pp3<- r.power0[which(r.power0[,2]==3), c(6,7,8,9,3,4)];
-	pp3<- t(pp3/loops);
+	pp3<- t(pp3);
 
 	return(list(pp1=pp1, pp2=pp2, pp3=pp3));
 }
 
-draw.3by3<-function( test.no1, test.no2, test.no3, pdf.file, data.folder, loops=100)
+draw.3by3<-function( test.no1, test.no2, test.no3, pdf.file, data.folder )
 {
 	r.power0 <- c();
 
@@ -117,7 +120,7 @@ draw.3by3<-function( test.no1, test.no2, test.no3, pdf.file, data.folder, loops=
 
 	par(mar=c( 1.5, 3, 0.75, 0.5 ));
 
-	r1 <- load.lskat.ret( test.no1, data.folder, loops=loops)
+	r1 <- load.lskat.ret( simu.rdata[test.no1], data.folder)
 	par(mgp=c(1.4, 0.3, 0), tck=-0.03);
 	bar.subplot(r1$pp1, ylim=c(0,1.05),  "", ylab=T);
 	par(mgp=c(1.4, 0.3, 0 ), tck=-0.03);
@@ -127,7 +130,7 @@ draw.3by3<-function( test.no1, test.no2, test.no3, pdf.file, data.folder, loops=
 
 	par(mar=c( 1.5, 3, 0.75, 0.5 ));
 
-	r2 <- load.lskat.ret( test.no2, data.folder, loops=loops)
+	r2 <- load.lskat.ret( simu.rdata[test.no2], data.folder)
 	par(mgp=c(1.4, 0.3, 0), tck=-0.03);
 	bar.subplot(r2$pp1, ylim=c(0,1.05), "", ylab=T);
 	par(mgp=c(1.4, 0.3, 0 ), tck=-0.03);
@@ -137,7 +140,7 @@ draw.3by3<-function( test.no1, test.no2, test.no3, pdf.file, data.folder, loops=
 
 	par(mar=c( 1.5, 3, 0.75, 0.5 ));
 
-	r3 <- load.lskat.ret( test.no3, data.folder, loops=loops)
+	r3 <- load.lskat.ret( simu.rdata[test.no3], data.folder)
 	par(mgp=c(1.4, 0.3, 0), tck=-0.03);
 	bar.subplot(r3$pp1, ylim=c(0,1.05), "", ylab=T );
 	par(mgp=c(1.4, 0.3, 0 ), tck=-0.03);
@@ -180,7 +183,7 @@ draw.3by3<-function( test.no1, test.no2, test.no3, pdf.file, data.folder, loops=
 }
 
 
-draw.2by3<-function( test.no1, test.no2, pdf.file, data.folder, loops=100)
+draw.2by3<-function( test.no1, test.no2, pdf.file, data.folder)
 {
 	r.power0 <- c();
 
@@ -206,7 +209,7 @@ draw.2by3<-function( test.no1, test.no2, pdf.file, data.folder, loops=100)
 
 	par(mar=c( 1.5, 3, 0.75, 0.5 ));
 
-	r1 <- load.lskat.ret( test.no1, data.folder, loops=loops)
+	r1 <- load.lskat.ret( simu.rdata[test.no1], data.folder)
 	par(mgp=c(1.4, 0.3, 0), tck=-0.03);
 	bar.subplot(r1$pp1, ylim=c(0,1.05),  "", ylab=T);
 	par(mgp=c(1.4, 0.3, 0 ), tck=-0.03);
@@ -216,7 +219,7 @@ draw.2by3<-function( test.no1, test.no2, pdf.file, data.folder, loops=100)
 
 	par(mar=c( 1.5, 3, 0.75, 0.5 ));
 
-	r2 <- load.lskat.ret( test.no2, data.folder, loops=loops)
+	r2 <- load.lskat.ret( simu.rdata[test.no2], data.folder)
 	par(mgp=c(1.4, 0.3, 0), tck=-0.03);
 	bar.subplot(r2$pp1, ylim=c(0,1.05), "", ylab=T);
 	par(mgp=c(1.4, 0.3, 0 ), tck=-0.03);
@@ -261,8 +264,8 @@ draw.2by3<-function( test.no1, test.no2, pdf.file, data.folder, loops=100)
 #draw.2by3( 14, 12, "Power-EC.ps", "simu-100/", 100);
 
 
-#draw.3by3( 1, 5, 4, "Power-154.pdf", "./", 1000);
-#draw.2by3( 14, 12, "Power-EC.pdf", "./", 1000);
+#draw.3by3( 1, 5, 4, "Power-154.pdf", "./");
+#draw.2by3( 14, 12, "Power-EC.pdf", "./");
 
-#draw.3by3( 1, 5, 4, "Power-154.ps", "./", 1000);
-#draw.2by3( 14, 12, "Power-EC.ps", "./", 1000);
+#draw.3by3( 1, 5, 4, "Power-154.ps", "./");
+#draw.2by3( 14, 12, "Power-EC.ps", "./");
