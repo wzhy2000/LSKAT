@@ -316,8 +316,7 @@ cat("formula=", model, "\n");
 		else
 			cat("***LME =Unavalaible.\n");
 
-        
-		obj.h0 <- try( longskat_est_model( phe$y, phe$cov, y.cov.time=par$y.cov.time, g.maxiter=1, intercept=par$intercept, method="ML" ));
+		obj.h0 <- try( longskat_est_model( phe$y, phe$cov, y.cov.time=par$y.cov.time, g.maxiter=1, intercept=par$intercept, method="REML" ));
 
 		if(class(obj.h0) != "try-error" && obj.h0$bSuccess )
 			rlist <- c( n.sample, obj.h0$par$sig_a, obj.h0$par$sig_b, obj.h0$par$sig_e, 
