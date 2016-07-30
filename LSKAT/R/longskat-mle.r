@@ -311,7 +311,7 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		AR.1 <- par_rho^abs(AR.1-t(AR.1));
 		sigma <- diag(sig_e^2, ncol) + sig_a^2 + sig_b^2*AR.1;
 
-		par_cov <- par[ c(5:(4+nCov)) ];
+		par_cov <- par[ c(5:(4+NCOL(X))) ];
 		y.delt <- y.long - t( array( X %*% par_cov, dim=c(NCOL(y.long), NROW(y.long))))
 	
 		A <- 0;
