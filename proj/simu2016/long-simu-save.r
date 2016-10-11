@@ -553,6 +553,6 @@ for(i in 1:16)
 for(i in 1:16)
 {
 	#cat("Test Plan = ", simu.folder[i], "=======================================>\n");
-	check_type1_ret_new(".", simu.rdata[i], nsample= 1000, nloop = 1000);
+	#check_type1_ret_new(".", simu.rdata[i], nsample= 1000, nloop = 1000);
 }
 
