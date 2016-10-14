@@ -16,14 +16,17 @@ longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, interc
 	return(ret);	
 }
 
-longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=TRUE, g.maxiter=20, init.par=list(), debug=F )
+longskat_est_ML<-function( y.long, y.cov0, y.time = NULL, y.cov.time=0, intercept=TRUE, g.maxiter=20, init.par=list(), debug=F )
 {
 	# check id matched before call here!
+	
+	y.cov <- y.cov0;
 	
 	if(is.data.frame(y.long))  y.long <- data.matrix(y.long)
 	if(is.data.frame(y.cov))  y.cov <- data.matrix(y.cov)
 	if(is.data.frame(y.time)) y.time<- data.matrix(y.time)
 
+	
 	ncol <- NCOL(y.long);
 	nrow <- NROW(y.long);
 	nCov <- NCOL(y.cov);
@@ -32,9 +35,9 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		y.time <- t(matrix(rep(c(1:ncol),nrow), nrow=ncol)) ;
 	
 	if(intercept) 
-		X <-  kronecker(cbind(1, y.cov), rep(1, ncol) )
-	else
-		X <-  kronecker(y.cov, rep(1, ncol) )
+		y.cov <- cbind(1, y.cov)
+
+	X <-  kronecker(y.cov, rep(1, ncol) )
 
 	if( y.cov.time > 0 ) 
 		for(i in 1:y.cov.time)
@@ -45,17 +48,20 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 
 	get_par<-function(par, y, y.time, y.cov )
 	{	
-		sig_a<-par[1];
-		sig_e<-par[2];
-		par_rho=0;
-		sig_b=0;
+		par_rho=par[1];
+		sig_a<-par[2];
+		sig_b=par[3];
+		sig_e<-par[4];
 
 		AR.1 <- array(1:ncol, dim=c(ncol,ncol))
 		AR.1 <- par_rho^abs(AR.1-t(AR.1));
 		sigma <- diag(sig_e^2, ncol) + sig_a^2 + sig_b^2*AR.1;
 
-		par_cov <- par[ c(3:(2+nCov)) ];
+		par_cov <- par[ c(5:(4+NCOL(y.cov))) ];
 		y.delt <- y.long - t( array( X %*% par_cov, dim=c(NCOL(y.long), NROW(y.long))))
+		
+		y.mean <- mean(y.delt)
+		y.delt - y.delt - y.mean;
 	
 		A <- 0;
 		if(any(is.na(y.delt)))
@@ -70,13 +76,15 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		else
 			A <- sum( dmvnorm( y.delt,  rep(0, ncol), sigma, log=T  ) );
 
-		return( -A );
+		ret <- -A - log(abs(y.mean))* log(NCOL(y.long))
+
+		return( ret );
 	}
 	
 	est_par_cov<-function()
 	{
 		#1: rho, 2:sig_a, 3:sig_b, 4:sig_e
-		par.init <- c( sd(y.long, na.rm=T)/2, sd(y.long, na.rm=T)/2 );
+		par.init <- c( 0.5, rep( sd(y.long, na.rm=T)/3,3) );
 
 		if(intercept)
 			par.init <- c(par.init, mean(y.long, na.rm=T));
@@ -142,13 +150,13 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		return( list(bSuccess=F) );
 	
 
-cat("SIG_A/B/E/R=", min.par[c(1:2)], "COV=", min.par[-c(1:2)], "LIKELIHOOD=", min.val, "\n"); 
+cat("SIG_A/B/E/R=", min.par[c(1:4)], "COV=", min.par[-c(1:4)], "LIKELIHOOD=", min.val, "\n"); 
 
-	par_rho <- 0;
-	sig_a   <- abs(min.par[1]);
-	sig_b   <- 0;
-	sig_e   <- abs(min.par[2]);
-	par_cov <- min.par[-c(1:2)];
+	par_rho <- abs(min.par[1]);
+	sig_a   <- abs(min.par[2]);;
+	sig_b   <- abs(min.par[3]);;
+	sig_e   <- abs(min.par[4]);
+	par_cov <- min.par[-c(1:4)];
 	par_mu  <- NA;
 	par_t   <- NA;
 	
@@ -164,7 +172,9 @@ cat("SIG_A/B/E/R=", min.par[c(1:2)], "COV=", min.par[-c(1:2)], "LIKELIHOOD=", mi
 		par_cov <- par_cov[ c(1:NCOL(y.cov))];
 	}
 
-	y.delt <- y.long - t( array( X %*% min.par[-c(1:2)], dim=c(NCOL(y.long), NROW(y.long))))
+	y.delt <- y.long - t( array( X %*% min.par[-c(1:4)], dim=c(NCOL(y.long), NROW(y.long))))
+
+cat("y.delt.mean=", mean(y.delt), "\n"); 
 
 	pars <- list( intercept=intercept,
 				  y.cov.time = y.cov.time,
@@ -176,7 +186,7 @@ cat("SIG_A/B/E/R=", min.par[c(1:2)], "COV=", min.par[-c(1:2)], "LIKELIHOOD=", mi
 			  	  par_cov= par_cov,  
 			  	  par_t  = par_t );  
 
-	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov, bSuccess=T );
+	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov0, bSuccess=T );
 	
 	class(r.model) <- "LSKAT.null.model";
 

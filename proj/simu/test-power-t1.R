@@ -1,4 +1,5 @@
 source("long-simu-test-rare2.r");
+source("test-nocorrelation.R");
 
 if(!exists("ncores")) ncores<-1;
 
@@ -14,7 +15,7 @@ par <- list(
 	par1        = 0.7,
 	par2        = 0.8,
 	times       = 8, 
-	intercept   = F,
+	intercept   = T,
 	y.cov.time  = 0,
 	par_t       = c(0.2, -0.08),
     snprange    = c(5*1000, 30*1000),
