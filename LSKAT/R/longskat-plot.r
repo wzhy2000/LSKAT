@@ -5,7 +5,7 @@ draw_manhattan<-function( res, map.title="", sig.thres, dot.cex, y.max=NA)
 	#par( mgp = c(2,0.2,0) );
 	#par( mar=c( 4, 4, 1.5, 1.5)+0.1);
 
-	pvalues <- -log10(res[,3]);
+	pvalues <- -log10(res[,2]);
 	nrow    <- dim(res)[1];
 	log10.max <- round(max(pvalues, na.rm=T))+1;
 

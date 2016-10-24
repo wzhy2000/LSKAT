@@ -17,7 +17,6 @@ check_plink_file<-function( file.plink.bed, file.plink.bim, file.plink.fam )
 	cat("* BIM file =", file.plink.bim, "\n");
 	cat("* FAM file =", file.plink.fam, "\n");
 
-	#library(snpStats);
 	#snp.mat <- try( read.plink( file.plink.bed,  file.plink.bim, file.plink.fam) );
 	#if(class(snp.mat)=="try-error")
 	#{
@@ -97,7 +96,7 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 	phe.fam <- try( read.table(file.plink.fam, header=F, stringsAsFactors=F) );
 	if (class(phe.fam)=="try-error")
 	{
-		cat("! Can not open file(", file.phe.fam, ")\n");
+		cat("! Can not open file(", file.plink.fam, ")\n");
 		return(list(bSuccess=F));
 	}
 	else{
@@ -137,7 +136,7 @@ check_pheno_file<-function( file.phe.long, file.phe.time, file.plink.fam )
 #
 # shareid, COV1,....
 
-check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
+check_covariate_file<-function( file.phe.cov, file.plink.fam  )
 {
 	cat("Checking covariate file......\n");
 
@@ -157,7 +156,7 @@ check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
 		show(head(phe.cov, n=5));
 	}
 
-	if (is.na(y.ncov)) y.ncov <- NCOL(phe.cov) - 1;
+	y.ncov <- NCOL(phe.cov) - 1;
 	if( NCOL(phe.cov) < 1 + y.ncov)
 	{
 		cat("! Insufficient covariates in the covariate file, ", NCOL(phe.cov), "<", 1 + y.ncov, ".\n" );
@@ -167,7 +166,7 @@ check_covariate_file<-function( file.phe.cov, file.plink.fam, y.ncov )
 	phe.fam <- try( read.table(file.plink.fam, header=F, stringsAsFactors=F) );
 	if (class(phe.fam)=="try-error")
 	{
-		cat("! Can not open file(", file.phe.fam, ")\n");
+		cat("! Can not open file(", file.plink.fam, ")\n");
 		return(list(bSuccess=F));
 	}
 
@@ -218,4 +217,67 @@ check_geneset_file<-function( file.gene.set )
 	cat("* SNPs =", NROW(tb), "\n");
 
 	return(list(bSuccess=T))
+}
+
+
+read_phe_cov<-function( file.phe.long, file.phe.time, file.phe.cov, PF.gen)
+{
+	phe.long <- read.csv(file.phe.long, header=T, stringsAsFactors=F, row.names=1);
+	cat("  PHE LONG =", file.phe.long, "\n");
+	cat("* Individuals =", NROW(phe.long), "\n");
+	cat("* Times =", NCOL(phe.long), "\n");
+	cat("* Mean =",  colMeans(phe.long, na.rm=T), "\n");
+	cat("* SD =",    colSds(phe.long, na.rm=T),"\n");
+	idx.na <- which( rowSums(is.na(phe.long)) == NCOL(phe.long) );
+	if( length(idx.na)>0) phe.long <- phe.long[ -idx.na, ,drop=F];
+
+	phe.time <- NULL;
+	if (!is.null(file.phe.time))
+	{
+		phe.time <- read.csv(file.phe.time, header=T, stringsAsFactors=F, row.names=1);
+		cat("  PHE TIME =", file.phe.time, "\n");
+		cat("* Individuals =", NROW(phe.time), "\n");
+		cat("* Times =", NCOL(phe.time), "\n");
+		cat("* Mean =",  colMeans(phe.time, na.rm=T), "\n");
+		cat("* SD =",    colSds(phe.time, na.rm=T),"\n");
+		idx.na <- which( rowSums( is.na(phe.time))==NCOL(phe.time) );
+		if( length(idx.na)>0) phe.time <- phe.time[ -idx.na, ];
+	}
+
+	phe.cov <- read.csv(file.phe.cov, header=T, stringsAsFactors=F, row.names=1);
+	cat("  PHE COV =", file.phe.cov, "\n");
+	cat("* Individuals =", NROW(phe.cov), "\n");
+	cat("* Covariate =", NCOL(phe.cov), "\n");
+	cat("* Mean =",  colMeans(phe.cov, na.rm=T), "\n");
+	cat("* SD =",    colSds(phe.cov, na.rm=T), "\n");
+
+	ids.phe <- intersect(rownames(phe.long), rownames(phe.cov) );
+	if(!is.null(phe.time))
+		ids.phe <- intersect(ids.phe, rownames(phe.time) );
+
+	ids.set <- intersect(ids.phe, get_gen_individuals(PF.gen) );
+	cat("  COMMON Individuals=", length(ids.set), "\n");
+
+	#eg. c(10:1)[match(c(4, 6,8,2,3), c(10:1))]
+	idx.long <- match( ids.set, rownames(phe.long) );
+	phe.long <- phe.long[idx.long, ,drop=F];
+
+	idx.cov <- match( ids.set, rownames(phe.cov) );
+	phe.cov <- phe.cov[idx.cov, , drop=F];
+
+	if(!is.null(phe.time))
+	{
+		idx.time <- match( ids.set, rownames(phe.time) );
+		phe.time <- phe.time[idx.time, ,drop=F];
+	}
+
+	sync_gen_individuals(PF.gen, ids.set)
+
+	if( !is.null(phe.time) && !all( rownames(phe.long) == rownames(phe.time) ) )
+		stop("! ID MATCH ERROR between PHE.LONG and PHE.TIME. \n");
+
+	if (!( all( rownames(phe.long)==rownames(phe.cov)) && all( rownames(phe.long)== get_gen_individuals(PF.gen) ) ) )
+		stop("! ID MATCH ERROR among 3 files( PHE.LONG, PHE.COV, PLINK.FAM). \n");
+
+	return(list( phe.long=phe.long, phe.time=phe.time, phe.cov = phe.cov));
 }

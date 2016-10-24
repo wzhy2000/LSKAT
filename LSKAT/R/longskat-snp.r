@@ -1,9 +1,9 @@
 #private:
 est_snp_Q.R<-function(Y.delt, maf, Z, Y.t, X, par_null, time.effect )
 {
-	sig_a2  <- par_null[1]^2
-	sig_b2  <- par_null[2]^2
-	sig_e2  <- par_null[3]^2
+	sig.a2  <- par_null[1]^2
+	sig.b2  <- par_null[2]^2
+	sig.e2  <- par_null[3]^2
 	par_rho <- par_null[4]
 
 	x.col <- NCOL(X);
@@ -16,7 +16,7 @@ est_snp_Q.R<-function(Y.delt, maf, Z, Y.t, X, par_null, time.effect )
 	for(j in 1:m)
 		AR.1[i,j] <- par_rho^abs(i-j);
 
-	V.j <- array(1, dim=c(m,m)) * sig_a2 +  AR.1 * sig_b2 + diag(1, m) * sig_e2
+	V.j <- array(1, dim=c(m,m)) * sig.a2 +  AR.1 * sig.b2 + diag(1, m) * sig.e2
 	V.j_1 <- solve(V.j);
 
 	V.j_x <- list();
@@ -72,18 +72,18 @@ est_snp_Q.R<-function(Y.delt, maf, Z, Y.t, X, par_null, time.effect )
 	#cat("Q.v==Q.v1", Q.v==Q.v1, "Q.w==Q.w1", Q.w==Q.w1, Q.v, Q.v1, Q.w, Q.w1, "\n");	
 	
 	r   <- sqrt(Q.v)/Q.w;
-	sig_r2 <- 0;
+	sig.r2 <- 0;
 	for(i in 1:n)
 	{
 		KY <- t(Y.j_x[[i]] - Z[i,1]*r)
-		sig_ri <- KY%*%V.j_x[[i]]%*%t(KY);
-		sig_r2 <- sig_r2 + sig_ri[1,1];
+		sig.ri <- KY%*%V.j_x[[i]]%*%t(KY);
+		sig.r2 <- sig.r2 + sig.ri[1,1];
 	}
 	
-	sig_r2 <- sig_r2/( n - 1- (x.col-1) -1 )
-	p.v <-  pchisq(Q.v/(Q.w*sig_r2), df=1, lower.tail=F);
+	sig.r2 <- sig.r2/( n - 1- (x.col-1) -1 )
+	p.v <-  pchisq(Q.v/(Q.w*sig.r2), df=1, lower.tail=F);
 	
-	return(list(v=Q.v, w=Q.w, r=r, sig_r2=sig_r2, chi2=Q.v/(Q.w*sig_r2), p.v=p.v ));
+	return(list(v=Q.v, w=Q.w, r=r, sig.r2=sig.r2, chi2=Q.v/(Q.w*sig.r2), p.v=p.v ));
 }
 
 est_snp_Q<-function(Y.delt, maf, Z, Y.t, X, par_null, time.effect, run.cpp=T)
@@ -104,7 +104,7 @@ est_snp_Q<-function(Y.delt, maf, Z, Y.t, X, par_null, time.effect, run.cpp=T)
 get_weights<-function(maf, n, beta.common=c(0.5, 0.5), beta.rare=c(1, 25),rare.cutoff=NULL )
 {
 	if(is.null(rare.cutoff)) rare.cutoff <- 1/sqrt(2*n);
-	
+
 	wj <- c();	
 	for( i in 1:length(maf))
 	{
@@ -133,8 +133,15 @@ SKAT_Scale_Genotypes_snp= function( Z, weights.common=c(0.5,0.5), weights.rare=c
 }
 
 #public:
-longskat_snp_run<-function(r.model, snp, weights.common=c(0.5,0.5), weights.rare=c(1,25), run.cpp=F, rare.cutoff=NULL, debug=debug)
+longskat_snp_test<-function(r.model, snp, 
+				weights.common=c(0.5,0.5), 
+				weights.rare=c(1,25), 
+				snp.impute = "mean",
+				rare.cutoff = NULL, 
+				verbose = FALSE)
 {
+	run.cpp <- F;
+	
 	get_snp_info<-function(snp)
 	{
 		s.miss <- which( is.na(snp) );
@@ -152,23 +159,28 @@ longskat_snp_run<-function(r.model, snp, weights.common=c(0.5,0.5), weights.rare
 		return(list( snp = snp.imp, maf = snp.maf, nmiss = length(s.miss), miss = s.miss ) );
 	}
 
-    snp.info <- snp;
+    snp.obj <- snp;
 	if (class(snp)!="list") 
-        snp.info <- get_snp_info(snp);
+        snp.obj <- get_snp_info(snp);
         
-	if (length(snp.info$miss)>0)
+	Y.delt <- r.model$phe.delt; 
+	Y.time <- r.model$phe.time; 
+	X <- r.model$phe.cov; 
+
+	if (!is.null(snp.obj$miss) && length(snp.obj$miss)>0)
 	{
-		if(debug) cat("! Missing SNP:", length(snp.info$miss), "\n");
-		Y.delt <- Y.delt[ -snp.info$miss, ,drop=F];
-		X <- X[-snp.info$miss, ,drop=F];
+		if(verbose) cat("! Missing SNP:", length(snp.obj$miss), "\n");
+		Y.delt <- Y.delt[ -snp.obj$miss, ,drop=F];
+		X <- X[-snp.obj$miss, ,drop=F];
 	}
 
-	Y.delt <- r.model$y.delt; 
-	Y.time <- r.model$y.time; 
-	par_null <- c( r.model$par$sig_a, r.model$par$sig_b, r.model$par$sig_e, r.model$par$rho );
-	X <- matrix( cbind(1, r.model$y.cov));
+	if(is.null(rare.cutoff))
+		rare.cutoff <- 1/sqrt(2*NROW(X));
 
-	Z.scale <- SKAT_Scale_Genotypes_snp( snp.info$snp, 
+	par_null <- c( r.model$par$sig.a, r.model$par$sig.b, r.model$par$sig.e, r.model$par$rho );
+	X <- matrix( cbind(1, r.model$phe.cov));
+
+	Z.scale <- SKAT_Scale_Genotypes_snp( snp.obj$snp, 
 					weights.common = weights.common, 
 					weights.rare   = weights.rare, 
 					rare.cutoff    = rare.cutoff )
@@ -184,12 +196,11 @@ longskat_snp_run<-function(r.model, snp, weights.common=c(0.5,0.5), weights.rare
 
 	P <- get_Qv_pvalue(Q$v, Q$w);
 
-	r.lskat<- list( snp.total = length(Z.scale$maf), 
-					snp.rare  = Z.scale$rare, 
-					qv        = Q$v, 
+	r.lskat<- list( qv        = Q$v, 
 					pv        = P$p.value, 
-					maf       = snp.info$maf, 
-					nmiss     = snp.info$nmiss,
+					maf       = snp.obj$maf, 
+					nmiss     = snp.obj$nmiss,
+					rare      = ifelse(snp.obj$maf<=rare.cutoff, TRUE, FALSE),
 	            	mle       = list(par=r.model$par, likelihood=r.model$likelihood) ); 
 	class(r.lskat) <- "LSKAT.snp.ret";
 
@@ -201,13 +212,13 @@ print.LSKAT.snp.ret<-function(r.lskat, useS4 = FALSE)
 {
 	cat("  LSKAT/SNP Summary\n");	
 	cat("[1] MLE Results:\n");	
-	cat("* SIGMA_A =",         r.lskat$mle$par$sig_a, "\n");
-	cat("* SIGMA_B =",         r.lskat$mle$par$sig_b, "\n");
-	cat("* SIGMA_E =",         r.lskat$mle$par$sig_e, "\n");
+	cat("* SIGMA_A =",         r.lskat$mle$par$sig.a, "\n");
+	cat("* SIGMA_B =",         r.lskat$mle$par$sig.b, "\n");
+	cat("* SIGMA_E =",         r.lskat$mle$par$sig.e, "\n");
 	cat("* RHO =",             r.lskat$mle$par$rho, "\n");
 	cat("* MU =",              r.lskat$mle$par$mu, "\n");
-	cat("* Beta(Cov)=",        r.lskat$mle$par$par_cov, "\n");
-	cat("* Beta(Time)=",       r.lskat$mle$par$par_t, "\n");
+	cat("* Beta(Cov)=",        r.lskat$mle$par$cov.effect, "\n");
+	cat("* Beta(Time)=",       r.lskat$mle$par$time.effect, "\n");
 	cat("* L(min) =",          r.lskat$mle$likelihood, "\n");
 
 	cat("[2] Paramaters:\n");	
@@ -219,86 +230,88 @@ print.LSKAT.snp.ret<-function(r.lskat, useS4 = FALSE)
 }
 
 #private:
-longskat_snp_task<-function(r.model, snp.range, file.gene.set, PF, weights.common, weights.rare, run.cpp=F, snp.impute="mean", rare.cutoff=NULL, debug=debug)
+longskat_snp_task<-function(r.model, PF.gen, PF.phe, 
+			snp.set, 
+			weights.common, 
+			weights.rare, 
+			run.cpp = FALSE, 
+			snp.impute = "mean", 
+			rare.cutoff = NULL, 
+			verbose = FALSE)
 {
-	gen.tb <- read.table(file.gene.set, sep=" ", header=F);
-
 	rs.name <-c();
 	gene.name <-c();
-	rs.lst <- vector("list", length(which(!is.na(snp.range))) );
+	rs.lst <- vector("list", length(which(!is.na(snp.set))) );
 	rs.lst.idx <- 0;
 	
-	for(i in snp.range )
+	for(i in snp.set )
 	{
 		if (is.na(i)) next;
 		
-		snp.vec <- PF$snp.mat$genotypes[, idx, drop=F ];
-		snp.info <- get_snp_plink_info (i, snp.vec, gen.tb );
+		snp.obj <- get_snp_mat (PF.gen, i, snp.impute);
+		if(is.null(snp.obj)) 
+			next;
 
-		if (any(is.na(snp.info)) ) next;
-		if (length(which(snp.info$maf>0.5))>0) browser();
-		if (length(snp.info$maf)==0) next;
-
-		ls <- longskat_snp_run( r.model, 
-						snp.info, 
+		ls <- longskat_snp_test( r.model, 
+						snp.obj, 
 						weights.common, 
 						weights.rare, 
-						run.cpp, 
+						#run.cpp, 
+						snp.impute  = snp.impute,
 						rare.cutoff = rare.cutoff, 
-						debug       = debug);
+						verbose     = verbose);
 		
 		rs.lst.idx <- rs.lst.idx + 1;
 		rs.lst[[rs.lst.idx]] <- c(i, 
-						snp.info$chr, 
-						snp.info$loc, 
-						snp.info$maf, 
-						length(snp.info$miss), 
-						ls$snp.total, 
-						ls$snp.rare, 
+						snp.obj$chr, 
+						snp.obj$loc, 
+						snp.obj$maf, 
+						ls$nmiss, 
+						ls$rare, 
 						ls$qv, 
 						ls$pv );
 						
-		rs.name     <- c(rs.name, as.character(snp.info$name) );
-		gene.name   <- c(gene.name, as.character(snp.info$gene) );
+		rs.name     <- c(rs.name, as.character(snp.obj$name) );
+		gene.name   <- c(gene.name, as.character(snp.obj$gene) );
 
-		if (debug) cat(" [", i, "]", 
-						snp.info$chr, 
-						snp.info$loc, 
-						as.character(snp.info$name), 
-						as.character(snp.info$gene), 
-						snp.info$maf, 
-						length(snp.info$miss), 
-						ls$snp.total, 
-						ls$snp.rare, 
+		if (verbose) cat(" [", i, "]", 
+						as.character(snp.obj$name), 
+						as.character(snp.obj$gene), 
+						snp.obj$chr, 
+						snp.obj$loc, 
+						snp.obj$maf, 
+						ls$nmiss, 
+						ls$rare, 
 						ls$qv, 
-						ls$pv, 
-						"\n");
+						ls$pv, "\n");
 	}	
 
+
 	rs <- do.call( "rbind", rs.lst );
-	ret <- data.frame( id = rs[,1], 
-					chr   = rs[,2], 
-					loc   = rs[,3], 
-					name  = rs.name, 
-					gene  = gene.name, 
-					maf   = rs[,4], 
-					miss  = rs[,5], 
-					total = rs[,6], 
-					rare  = rs[,7], 
-					Q     = rs[,8], 
-					pv    = rs[,9]);
+	ret <- data.frame( 
+					index     = unlist(rs[,1,drop=F]), 
+					snp.name  = unlist(rs.name), 
+					gene.name = unlist(gene.name), 
+					chr       = unlist(rs[,2,drop=F]), 
+					pos       = unlist(rs[,3,drop=F]), 
+					maf       = unlist(rs[,4,drop=F]), 
+					nmiss     = unlist(rs[,5,drop=F]), 
+					rare      = unlist(rs[,6,drop=F]), 
+					q.lskat   = unlist(rs[,7,drop=F]), 
+					p.lskat   = unlist(rs[,8,drop=F]));
 
 	return(ret);
 }
 
 #public
 longskat_snp_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam, 
-						file.gene.set, 
 						file.phe.long, 
 						file.phe.cov, 
-						file.phe.time=NULL, 
-						snp.range=NULL,  
-						options = list() )
+						file.phe.time = NULL, 
+						file.gene.set = NULL,
+						snp.set = NULL,  
+						options = list(),
+						verbose = FALSE)
 {	
 	cat( "[ LONGSKAT_SNP_PLINK ] Procedure\n");
 	cat( "Checking the optional items......\n");
@@ -314,15 +327,11 @@ longskat_snp_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 	
 	show_options(options);
 	
-	chk.genset <- check_geneset_file( file.gene.set )
-	if ( !chk.genset$bSuccess )
-		stop("Gene defintion file  is failed to load.")
-
 	chk.phe <- check_pheno_file( file.phe.long, file.phe.time, file.plink.fam ) 
 	if ( !chk.phe$bSuccess )
 		stop("Phenotypic data file is failed to load.")
 
-	chk.cov <- check_covariate_file( file.phe.cov, file.plink.fam, options$y.cov.count )
+	chk.cov <- check_covariate_file( file.phe.cov, file.plink.fam)
 	if ( !chk.cov$bSuccess )
 		stop("Covariate data file is failed to load.")
 
@@ -330,90 +339,108 @@ longskat_snp_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 	if ( !chk.plink$bSuccess )
 		stop("PLINK file can not be loaded by the snpStats package.")
 
+	chk.genset <- check_geneset_file( file.gene.set )
+	if ( !chk.genset$bSuccess )
+		stop("Gene defintion file  is failed to load.")
+
 	cat( "Starting to load all data files......\n");
 
-	PF <- read_gen_phe_cov( file.plink.bed, file.plink.bim, file.plink.fam, file.phe.long, file.phe.time, file.phe.cov ); 
-	if(missing(options$y.cov.count) || is.na(options$y.cov.count) ) options$y.cov.count <- NCOL(PF$phe.cov);
+	PF.gen <- read_gen_plink ( file.plink.bed, file.plink.bim, file.plink.fam, file.gene.set, options$plink.path )
 
-	PF.par <- list(file.plink.bed = file.plink.bed, 
-					file.plink.bim = file.plink.bim, 
-					file.plink.fam = file.plink.fam, 
-					file.phe.long  = file.phe.long, 
+	PF.phe <- read_phe_cov ( file.phe.long, file.phe.time, 	file.phe.cov, PF.gen );
+
+	PF.par <- list( file.plink.bed = file.plink.bed,
+					file.plink.bim = file.plink.bim,
+					file.plink.fam = file.plink.fam,
+					file.phe.long  = file.phe.long,
+					file.phe.time  = file.phe.time,
 					file.phe.cov   = file.phe.cov,
-					file.gene.set  = file.gene.set,
-					y.cov.count    = options$y.cov.count, 
-					y.cov.time     = options$y.cov.time,
-					weights.common = options$weights.common, 
+					cov.count      = NCOL(PF.phe$phe.cov),
+					time.cov       = options$time.cov,
+					weights.common = options$weights.common,
 					weights.rare   = options$weights.rare,
 					rare.cutoff    = options$rare.cutoff);
 
-	if( is.na(options$y.cov.count) )
-		options$y.cov.count <- NCOL(PF$phe.cov)-1;
-
 	cat( "Starting to estimate the SIGMA_A, SIGMA_B, SIGMA_E and other parameters......\n");
 
-	r.model <- longskat_est_model(PF$phe.long, 
-					PF$phe.cov, 
-					PF$phe.time, 
-					y.cov.time = options$y.cov.time, 
-					g.maxiter  = options$g.maxiter, 
-					debug      = options$debug);
+	r.model <- longskat_est_model(PF.phe$phe.long,
+					PF.phe$phe.cov,
+					PF.phe$phe.time,
+					time.cov   = options$time.cov,
+					g.maxiter  = options$g.maxiter,
+					intercept  = options$intercept,
+					verbose    = options$verbose,
+					par.init   = options$par.init,
+					method     = options$est.method);
 
-	if( class(r.model) != "LSKAT.null.model" ) 
+	if( class(r.model) != "LSKAT.null.model" )
 		stop("! Failed to estimate the parameters of Covariance Compoment.");
 
-	cat("* SIGMA_A =",    r.model$par$sig_a, "\n");
-	cat("* SIGMA_B =",    r.model$par$sig_b, "\n");
-	cat("* SIGMA_E =",    r.model$par$sig_e, "\n");
-	cat("* RHO =",        r.model$par$rho, "\n");
-	cat("* MU =",         r.model$par$mu, "\n");
-	cat("* Beta(Cov) =",  r.model$par$par_cov, "\n");
-	cat("* Beta(Time) =", r.model$par$par_t, "\n");
-	cat("* L(min) =",     r.model$likelihood, "\n");
+	cat("* SIGMA_A =",   r.model$par$sig.a, "\n");
+	cat("* SIGMA_B =",   r.model$par$sig.b, "\n");
+	cat("* SIGMA_E =",   r.model$par$sig.e, "\n");
+	cat("* RHO =",       r.model$par$rho, "\n");
+	cat("* MU =",        r.model$par$mu, "\n");
+	cat("* Beta(Cov) =", r.model$par$cov.effect, "\n");
+	cat("* Beta(Time) =",r.model$par$time.effect, "\n");
+	cat("* L(min) =",    r.model$likelihood, "\n");
+	cat("* Invalid IDs =",    length(r.model$na.rm.id), "\n");
 
-	snp.len <- dim(PF$snp.mat$genotypes)[2];
-	if (is.null(snp.range)) snp.range<- c(1:snp.len)
-	if( length(which( snp.range > snp.len))>0 )
+	if (is.null(snp.set))
+		snp.set<- c(1:NROW(PF.gen$snp$bim))
+
+	if(is.character(snp.set))
 	{
-		warning("The snp range is out of data set.");
-		snp.range <- snp.range[- which( snp.range > snp.len ) ];
+		snp.idx <- match(snp.set, PF.gen$snp$bim[,2]);
+		if( sum(!is.na(snp.idx))==0)
+			stop("All SNPs in the parameter 'snp.set' are available in current gene defintion file.\n");
+			
+		snp.set <- snp.idx[!is.na(snp.idx)];
 	}
 
-	cat("* SNP.RANGE =", min(snp.range),"-", max(snp.range), "[", length(snp.range), "]\n");
+	if( length(which( snp.set > NROW(PF.gen$snp$bim[,2]) ))>0 )
+	{
+		warning("The snp range is out of data set.");
+		snp.set <- snp.set[- which( snp.set > NROW(PF.gen$snp$bim[,2]) ) ];
+	}
+
+	cat("* SNP.RANGE =", min(snp.set),"-", max(snp.set), "[", length(snp.set), "]\n");
 	
 	cpu.fun<-function( sect )
 	{
-		snp.range0 <- snp.range[((sect-1)*n.percpu+1):(sect*n.percpu)];
-		
-		PF <- read_gen_phe_cov ( PF.par$file.plink.bed, PF.par$file.plink.bim, PF.par$file.plink.fam, 
-						PF.par$file.phe.long, 
-						PF.par$file.phe.cov );
-		
-		ret.cluster <- longskat_snp_task( r.model, 
-						snp.range0, 
-						PF.par$file.gene.set, 
-						PF, 
-						weights.common = options$weights.common, 
-						weights.rare   = options$weights.rare, 
-						run.cpp        = options$run.cpp, 
-						snp.impute     = options$snp.impute, 
-						rare.cutoff    = options$rare.cutoff, 
-						debug          = options$debug );
+		g.range0 <- snp.set[((sect-1)*n.perjob+1):(sect*n.perjob)];
+		if ( length(snp.set) < sect*n.perjob )
+			g.range0 <- snp.set[((sect-1)*n.perjob+1):length(snp.set)];
 
-		return(ret.cluster);
+		PF.gen.new <- clone_plink_refer(PF.gen)
+
+		res.cluster <- longskat_snp_task( r.model,
+						PF.gen.new,
+						PF.phe,
+						g.range0,
+						options$weights.common,
+						options$weights.rare,
+						options$run.cpp,
+						options$snp.impute,
+						options$rare.cutoff,
+						options$verbose );
+
+
+		return(res.cluster);
 	}
 
-	lskat.ret<-c();
 	tm.start <- proc.time();
-	if( options$n.cpu>1 && require(snowfall) )
+	n.perjob <- 100;
+	n.subjob <- ceiling( length(snp.set)/100 );
+	res.cluster <- list();
+
+	if( options$n.cpu>1 )
 	{
 		cat("Starting parallel computing, snowfall/snow......\n"); 
 		sfInit(parallel=TRUE, cpus=options$n.cpu, type="SOCK")
 
-		n.percpu <- ceiling( length(snp.range)/options$n.cpu );
-		sfExport("n.percpu", "snp.range", "Y.delt", "Y.t", "X", "par_null", "options", "PF.par" );
-		
-		ret.cluster <- sfClusterApplyLB( 1:options$n.cpu, cpu.fun);
+		sfExport("n.perjob", "snp.set", "r.model", "PF.gen", "PF.phe", "options", "PF.par");
+		ret.cluster <- sfClusterApplyLB( 1:n.subjob, cpu.fun);
 		sfStop();
 
 		cat("Stopping parallel computing......\n"); 
@@ -421,66 +448,61 @@ longskat_snp_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 	}
 	else
 	{
-		cat("Starting the LSKAT estimate for each gene......\n");
-		lskat.ret <- longskat_snp_task( r.model, 
-						snp.range, 
-						file.gene.set, 
-						PF, 
-						weights.common = options$weights.common, 
-						weights.rare   = options$weights.rare, 
-						run.cpp        = options$run.cpp, 
-						snp.impute     = options$snp.impute, 
-						rare.cutoff    = options$rare.cutoff, 
-						debug          = options$debug );
+		cat("Starting the LSKAT estimate for each SNP......\n");
+		for(k in 1:n.subjob)
+			res.cluster[[k]] <- cpu.fun(k);
 	}
 	
+	lskat.ret <- do.call("rbind", res.cluster);
+
 	tm <- proc.time() - tm.start;
 	cat( "* RUNTIME =", tm[3], "seconds \n");
-	
-	ret = list( snp=lskat.ret, par=PF.par, mle=r.model);
+
+
+	ret = list( result=lskat.ret, par=PF.par, mle=r.model);
 	class(ret) <- "LSKAT.snp.plink";
 
 	return(ret);
 }
 
 #public:
-print.LSKAT.snp.plink<-function(r.lskat, useS4 = FALSE)
+summary.LSKAT.snp.plink<-function(r.lskat)
 {
-	summary.LSKAT.snp.plink(r.lskat);
+	return(r.lskat$result);
 }
 
 #public:
-summary.LSKAT.snp.plink<-function(r.lskat)
+print.LSKAT.snp.plink<-function(object, useS4 = FALSE)
 {
 	cat("  LSKAT/SNP Summary\n");	
 	cat("[1] Paramaters:\n");	
-	cat("* PHE.LOG.FILE = ",   r.lskat$par$file.phe.long, "\n");	
-	cat("* PHE.LOG.TIME = ",   r.lskat$par$file.phe.time, "\n");	
-	cat("* PHE.COV.FILE = ",   r.lskat$par$file.phe.cov, "\n");	
-	cat("* Covariate Count = ",r.lskat$par$y.cov.count, "\n");	
-	cat("* Time Effect = ",    r.lskat$par$y.cov.time, "\n");	
-	cat("* Weight Rare = ",    r.lskat$par$weights.rare, "\n");	
-	cat("* Weight Common = ",  r.lskat$par$weights.common, "\n");	
+	cat("* PHE.LOG.FILE = ",   object$par$file.phe.long, "\n");	
+	cat("* PHE.LOG.TIME = ",   object$par$file.phe.time, "\n");	
+	cat("* PHE.COV.FILE = ",   object$par$file.phe.cov, "\n");	
+	cat("* Covariate Count = ",object$par$cov.count, "\n");	
+	cat("* Time Effect = ",    object$par$time.cov, "\n");	
+	cat("* Weight Rare = ",    object$par$weights.rare, "\n");	
+	cat("* Weight Common = ",  object$par$weights.common, "\n");	
 
 	cat("[2] MLE Results:\n");	
-	cat("* SIGMA_A =",         r.lskat$mle$par$sig_a, "\n");
-	cat("* SIGMA_B =",         r.lskat$mle$par$sig_b, "\n");
-	cat("* SIGMA_E =",         r.lskat$mle$par$sig_e, "\n");
-	cat("* RHO =",             r.lskat$mle$par$rho, "\n");
-	cat("* MU =",              r.lskat$mle$par$mu, "\n");
-	cat("* Beta(Cov)=",        r.lskat$mle$par$par_cov, "\n");
-	cat("* Beta(Time)=",       r.lskat$mle$par$par_t, "\n");
-	cat("* L(min) =",          r.lskat$mle$likelihood, "\n");
+	cat("* SIGMA_A =",         object$mle$par$sig.a, "\n");
+	cat("* SIGMA_B =",         object$mle$par$sig.b, "\n");
+	cat("* SIGMA_E =",         object$mle$par$sig.e, "\n");
+	cat("* RHO =",             object$mle$par$rho, "\n");
+	cat("* MU =",              object$mle$par$mu, "\n");
+	cat("* Beta(Cov)=",        object$mle$par$cov.effect, "\n");
+	cat("* Beta(Time)=",       object$mle$par$time.effect, "\n");
+	cat("* L(min) =",          object$mle$likelihood, "\n");
 
 	cat("[3] Longitudinal SKAT Results:\n");
-	cat("* SNP Count = ", NROW(r.lskat$snp), "\n");	
+	cat("* SNP Count = ", NROW(object$result), "\n");	
 
-	# 1st = Chr, 2nd= Loc, 3rd=SNP.name, 4th=Gene.name, 5th=MAF, 
-	# 6th = NMISS, 7th=Total, 8th=Rare, 9th=Q, 10th= PV,
+	# 1st=index, 2nd=SNP.name, 3rd=Gene.name, 4th = Chr, 5th= Loc, 
+	# 6th=MAF, 7th = NMISS, 8th=Rare, 9th=q.lskat, 10th= p.lskat,
 	
-	df.snp <- cbind( r.lskat$snp[, c(1,2,3,4,5,10),drop=F], bonferroni=p.adjust( r.lskat$snp[,10], method="bonferroni"));
+	df.snp <- cbind( object$result[, c(2,3,4,5,6,7,10),drop=F], bonferroni=p.adjust( object$result[,10], method="bonferroni"));
 	df.snp <- df.snp[ order(df.snp[,6]),,drop=F ]; 
-	colnames(df.snp) <- c("SNP", "Gene", "Chr.", "Pos.", "MAF", "p-value", "Bonferroni");
+	colnames(df.snp) <- c("SNP", "Gene", "Chr.", "Pos.", "MAF", "NMISS", "p-value", "Bonferroni");
 	
 	n.sig <- c();
 	n.sig.i <- c();
@@ -495,8 +517,8 @@ summary.LSKAT.snp.plink<-function(r.lskat)
 	}
 
 	cat("  Summary of LSKAT result:\n");	
-	cat("* PHE.LOG.FILE = ", r.lskat$par$file.phe.long, "\n")	
-	cat("* PHE.COV.FILE = ", r.lskat$par$file.phe.cov, "\n")	
+	cat("* PHE.LOG.FILE = ", object$par$file.phe.long, "\n")	
+	cat("* PHE.COV.FILE = ", object$par$file.phe.cov, "\n")	
 	if (length(n.sig.i)>0)
 	{
 		cat("* Significant Genes (Bonferroni Correct):\n")	
@@ -505,17 +527,17 @@ summary.LSKAT.snp.plink<-function(r.lskat)
 	}
 	
 	cat("* Top 20 SNPs (Bonferroni Correct):\n");
-	show(df.snp[c(1:20),]);
+	show(df.snp[c(1:ifelse(NROW(df.snp)>20, 20,NROW(df.snp))),]);
 
 }
 
 #public:
-plot.LSKAT.snp.plink<-function( r.lskat, pdf.file=NA, title="",  y.max=NA )
+plot.LSKAT.snp.plink<-function( object, pdf.file=NA, title="",  y.max=NA )
 {
-	if(is.na(pdf.file)) pdf.file<-paste(r.lskat$par$file.phe.long, ".pdf", sep="");
+	if(is.na(pdf.file)) pdf.file<-paste(object$par$file.phe.long, ".pdf", sep="");
 
 	#CHR, POS, NAME, PV
-	df.snp <- r.lskat$snp[,c(1,2,3,10)];
+	df.snp <- object$result[,c(4,5,2,10)];
 	df.snp <- df.snp[ order(df.snp[,1], df.snp[,2]), ]; 
 	df.snp[,4] <- df.snp[,4]*NROW(df.snp);
 
@@ -523,7 +545,7 @@ plot.LSKAT.snp.plink<-function( r.lskat, pdf.file=NA, title="",  y.max=NA )
 
 	par(mar=c(3.2, 3.5,  2.5, 1))
 	par(mgp=c(1.4, 0.3, 0), tck=-0.03)
-	draw_manhattan( df.snp[,c(1,3,4)], map.title=title, 0.0001/NROW(df.snp), 0.7, y.max= y.max );
+	draw_manhattan( df.snp[,c(1,4)], map.title=title, 0.0001/NROW(df.snp), 0.7, y.max= y.max );
 
 	dev.off();
 

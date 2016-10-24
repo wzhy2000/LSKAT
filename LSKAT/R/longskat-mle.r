@@ -1,5 +1,3 @@
-library(mvtnorm)
-
 #solve the problem 'Lapack routine dgesv: system is exactly singular: U[7,7] = 0'
 Get_SKAT_Residuals.Get_X1 = function(X1){
 	
@@ -15,32 +13,62 @@ Get_SKAT_Residuals.Get_X1 = function(X1){
 
 #public
 
-longskat_est_model<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=FALSE, g.maxiter=20, par.init=list(), debug=F, method=c("REML", "ML") )
+longskat_est_model<-function( phe.long, phe.cov, 
+				phe.time = NULL, 
+				time.cov = 0,
+                intercept = FALSE, 
+                method = c("REML", "ML"), 
+                g.maxiter =  20, 
+                par.init = list(), 
+                verbose = F )
 {
+	y.long <- phe.long;
+	y.cov  <- phe.cov;
+	y.time <- phe.time;
+	
 	if(missing(method)) method <- "REML";
-	if(missing(debug)) debug <- F;
+	if(missing(verbose)) verbose <- F;
 
-	na.idx <- which(is.na(rowSums(y.cov)));
-	if(length(na.idx)>0)
+	na.rm.id <- c();
+	na.idx1 <- c(na.rm.id, which(is.na(rowSums(y.cov))) );
+	if(length(na.idx1)>0)
 	{
-		y.long <- y.long[-na.idx,,drop=F];
-		y.cov  <- y.cov[-na.idx,,drop=F]; 
-		if(!is.null(y.time)) y.time <- y.time[-na.idx,,drop=F];
+		na.rm.id <- c(na.rm.id, rownames(y.cov)[na.idx1] ); 
+		y.long <- y.long[-na.idx1,,drop=F];
+		y.cov  <- y.cov[-na.idx1,,drop=F]; 
+		if(!is.null(y.time)) y.time <- y.time[-na.idx1,,drop=F];
+	}	
+
+	y.long.na <- y.long;
+	y.long.na[!is.na(y.long.na)] <- 1;
+	y.long.na[is.na(y.long.na)] <- 0;
+	na.idx2 <- which(rowSums(y.long.na)==0);
+	if(length(na.idx2)>0)
+	{
+		na.rm.id <- c(na.rm.id, rownames(y.long)[na.idx2]); 
+		y.long <- y.long[-na.idx2,,drop=F];
+		y.cov  <- y.cov[-na.idx2,,drop=F]; 
+		if(!is.null(y.time)) y.time <- y.time[-na.idx2,,drop=F];
 	}	
 
 	if(method=="REML")
-		ret <- longskat_est_REML( y.long, y.cov, y.time, y.cov.time, intercept, g.maxiter, par.init, debug )
+		ret <- longskat_est_REML( y.long, y.cov, y.time, time.cov, intercept, g.maxiter, par.init, verbose )
 	else	
-		ret <- longskat_est_ML( y.long, y.cov, y.time, y.cov.time, intercept, g.maxiter, par.init, debug );
+		ret <- longskat_est_ML( y.long, y.cov, y.time, time.cov, intercept, g.maxiter, par.init, verbose );
 		
-	return(ret);	
+	ret$na.rm.id <- na.rm.id;
+	
+	if(ret$bSuccess)
+		return(ret)
+	else
+		return(NULL);
 }
 
 # y.long format:  <shareid> trait1, ..., traitN
 # y.time format: <shareid> time1, ..., timeN
 # y.cov format:  <shareid> cov1, ..., covM
 
-longskat_est_REML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=FALSE, g.maxiter=20, par.init=list(), debug=F )
+longskat_est_REML<-function( y.long, y.cov, y.time = NULL, time.cov = 0, intercept=FALSE, g.maxiter=20, par.init=list(), verbose=F )
 {
 	# check id matched before call here!
 
@@ -54,7 +82,7 @@ longskat_est_REML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, interce
 	if( is.null(y.time))
 		y.time <- t(matrix(rep(c(1:ncol),nrow), nrow=ncol)) ;
 
-if(debug)
+if(verbose)
 {
 	cat("y.cov", "ncol=", ncol, "intercept=", intercept,  "\n");
 	show(head(y.cov));
@@ -65,8 +93,8 @@ if(debug)
 	else
 		X <-  kronecker(y.cov, rep(1, ncol) )
 
-	if( y.cov.time > 0 ) 
-		for(i in 1:y.cov.time)
+	if( time.cov > 0 ) 
+		for(i in 1:time.cov )
 			X <- cbind(X, c(t(y.time))**i)	
 
 	X.i <- lapply(1:nrow, function(i){ 
@@ -88,7 +116,7 @@ if(debug)
 #show(head(y.cov));
 #show(head(y.time));
 	
-	RMEL<-function(sig_a, sig_b, sig_e, par_rho)
+	RMEL<-function(sig.a, sig.b, sig.e, par_rho)
 	{
 		AR.1 <- array(1:ncol, dim=c(ncol,ncol))
 		AR.1 <- par_rho^abs(AR.1-t(AR.1));
@@ -97,11 +125,11 @@ if(debug)
 					D <- diag(1,ncol(U.i[[i]]));
 					YP <- t(y.long[i,,drop=F]); 
 					AR.i <- AR.1[!is.na(YP), !is.na(YP), drop=F];
-					D[c(2:nrow(D)), c(2:nrow(D))] <- sig_b^2*AR.i; 
-					D[1,1] <- sig_a^2;
+					D[c(2:nrow(D)), c(2:nrow(D))] <- sig.b^2*AR.i; 
+					D[1,1] <- sig.a^2;
 					return(D);} );
 
-		E.i  <- diag(sig_e^2, ncol);
+		E.i  <- diag(sig.e^2, ncol);
 
 		V_1 <- lapply(1:nrow, function(k) { kcol <- NROW(U.i[[k]]); solve( U.i[[k]] %*% D.i[[k]] %*% t(U.i[[k]]) + E.i[1:kcol, 1:kcol] ) } );
 		XVX.i <- lapply(1:nrow, function(k){ t(X.i[[k]]) %*% V_1[[k]] %*% X.i[[k]]; });
@@ -129,11 +157,11 @@ if(debug)
 		if ( par_rho<0 || par_rho>0.99 )
 			return(NaN);
 
-		sig_a <- abs(par[2]);
-		sig_b <- abs(par[3]);
-		sig_e <- abs(par[4]);
+		sig.a <- abs(par[2]);
+		sig.b <- abs(par[3]);
+		sig.e <- abs(par[4]);
 
-		r <- RMEL(sig_a, sig_b, sig_e, par_rho);
+		r <- RMEL(sig.a, sig.b, sig.e, par_rho);
 		
 		if(is.infinite(r$LR))
 			r$LR <- .Machine$double.xmax
@@ -144,11 +172,11 @@ if(debug)
 	}
 
 	# par[1] = rho
-	# par[2] = sig_a
-	# par[3] = sig_b
-	# par[4] = sig_e
+	# par[2] = sig.a
+	# par[3] = sig.b
+	# par[4] = sig.e
 	# e.g.
-	# par.init <- c(rho=0.75, sig_a=0.2, sig_b=0.3, sig_e=0.1 ); 
+	# par.init <- c(rho=0.75, sig.a=0.2, sig.b=0.3, sig.e=0.1 ); 
 	
 	if (is.null(par.init) || length(par.init)==0)
 		par.init <- c( 0.5, rep(sd(y.long, na.rm=T)/3, 3) );
@@ -165,7 +193,6 @@ cat("REML parin=", par.init, "\n");
 	{
 		#r0 <- try( optim( par.init, get_par, method = "L-BFGS-B", #control=list(maxit=2500),
 		#		lower=c(0.01, rep(sd.ref/100, 3 )) ,upper=c(0.99, rep(sd.ref*10, 3) ) ), silent = F );
-
 		r0 <- try( optim( par.init, get_par, method = "BFGS", control=list(maxit=5000) ), silent = F );
 
 		if (class(r0)=="try-error")
@@ -179,7 +206,7 @@ cat("REML parin=", par.init, "\n");
 		loop.n <- loop.n+1;
 		if ( r0$convergence==0 && r0$val<min.val)
 		{
-			if(debug) cat("  LOOP =", loop.n, "/", g.maxiter, " val=", r0$val,  "par=", r0$par, "\n");
+			if(verbose) cat("  LOOP =", loop.n, "/", g.maxiter, " val=", r0$val,  "par=", r0$par, "\n");
 			
 			tolerance <- max( c( min.val, par.init) - c(r0$value, r0$par) );
 			
@@ -191,50 +218,54 @@ cat("REML parin=", par.init, "\n");
 		par.init <- par.init*runif( length(par.init), 0.8, 1.2 );
 	}
 
-	if(debug) cat("  Final =", loop.n, " min.val=", min.val, "par=", min.par, "\n");
+	if(verbose) cat("  Final =", loop.n, " min.val=", min.val, "par=", min.par, "\n");
 	
 	if( is.infinite( min.val) || is.na(min.val) || any(is.na(min.par))  )
 		return( list(bSuccess=F) );
 
 	par_rho<- min.par[1]
-	sig_a  <- abs(min.par[2]);
-	sig_b  <- abs(min.par[3]);
-	sig_e  <- abs(min.par[4]);
+	sig.a  <- abs(min.par[2]);
+	sig.b  <- abs(min.par[3]);
+	sig.e  <- abs(min.par[4]);
 
-	LR <- RMEL(sig_a, sig_b, sig_e, par_rho  );
+	LR <- RMEL(sig.a, sig.b, sig.e, par_rho  );
 	
 cat("SIG_A/B/E/R=", min.par, "COV=", c(LR$B), "DELT=", range(LR$YXB), "\n"); 
 
-	par_cov <- c(LR$B);
+	cov.effect <- c(LR$B);
 	par_mu  <- NA;
-	par_t   <- NA;
+	time.effect   <- NA;
 	
 	if(intercept)
 	{
-		par_mu  <- par_cov[1];
-		par_cov <- par_cov[-1];
+		par_mu  <- cov.effect[1];
+		cov.effect <- cov.effect[-1];
 	}
 	
-	if( y.cov.time > 0)
+	if( time.cov > 0)
 	{
-		par_t <- par_cov[-c(1:NCOL(y.cov))];
-		par_cov <- par_cov[ c(1:NCOL(y.cov))];
+		time.effect <- cov.effect[-c(1:NCOL(y.cov))];
+		cov.effect <- cov.effect[ c(1:NCOL(y.cov))];
 	}
 
 
 	y.delt <- y.long - t( array( X %*% LR$B, dim=c(NCOL(y.long), NROW(y.long))))
 
 	pars <- list( intercept=intercept,
-				  y.cov.time = y.cov.time,
+				  time.cov  = time.cov,
 			  	  mu     = par_mu, 
 			  	  rho    = par_rho, 
-			  	  sig_a  = sig_a, 
-			  	  sig_b  = sig_b, 
-			  	  sig_e  = sig_e, 
-			  	  par_cov= par_cov,  
-			  	  par_t  = par_t);  
+			  	  sig.a  = sig.a, 
+			  	  sig.b  = sig.b, 
+			  	  sig.e  = sig.e, 
+			  	  cov.effect= cov.effect,  
+			  	  time.effect  = time.effect);  
 
-	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov, bSuccess=T );
+	r.model <- list(par = pars, likelihood = min.val, 
+			phe.delt = y.delt, 
+			phe.time = y.time, 
+			phe.cov = y.cov, 
+			bSuccess=T );
 	
 	class(r.model) <- "LSKAT.null.model";
 
@@ -247,13 +278,13 @@ print.LSKAT.null.model <- function(r.model, useS4=FALSE)
 	cat("  LSKAT/Gene Summary\n");	
 	cat("[1] MLE Results:\n");	
 	cat("* Intercept =",       r.model$par$intercept, "\n");
-	cat("* SIGMA_A =", 		   r.model$par$sig_a, "\n");
-	cat("* SIGMA_B =",         r.model$par$sig_b, "\n");
-	cat("* SIGMA_E =",         r.model$par$sig_e, "\n");
+	cat("* SIGMA_A =", 		   r.model$par$sig.a, "\n");
+	cat("* SIGMA_B =",         r.model$par$sig.b, "\n");
+	cat("* SIGMA_E =",         r.model$par$sig.e, "\n");
 	cat("* RHO =",             r.model$par$rho, "\n");
 	cat("* MU =",              r.model$par$mu, "\n");
-	cat("* Beta(Cov)=",        r.model$par$par_cov, "\n");
-	cat("* Beta(Time)=",       r.model$par$par_t, "\n");
+	cat("* Beta(Cov)=",        r.model$par$cov.effect, "\n");
+	cat("* Beta(Time)=",       r.model$par$time.effect, "\n");
 	cat("* L(min) =",          r.model$likelihood, "\n");
 }
 
@@ -270,7 +301,7 @@ get_ylog_list<-function(y.long)
 	return(y.long.list)
 }
 
-longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept=TRUE, g.maxiter=20, init.par=list(), debug=F )
+longskat_est_ML<-function( y.long, y.cov, y.time = NULL, time.cov=0, intercept=TRUE, g.maxiter=20, init.par=list(), verbose=F )
 {
 	# check id matched before call here!
 	
@@ -290,9 +321,10 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 	else
 		X <-  kronecker(y.cov, rep(1, ncol) )
 
-	if( y.cov.time > 0 ) 
-		for(i in 1:y.cov.time)
+	if( time.cov > 0 ) 
+		for(i in 1:time.cov)
 			X <- cbind(X, c(t(y.time))**i)	
+
 #show(head(y.long));
 #show(head(y.cov));
 #show(head(y.time));
@@ -303,23 +335,23 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		if ( par_rho<0 || par_rho>=0.99 )
 			return(NaN);
 
-		sig_a<-par[2];
-		sig_b<-par[3];
-		sig_e<-par[4];
+		sig.a<-par[2];
+		sig.b<-par[3];
+		sig.e<-par[4];
 
 		AR.1 <- array(1:ncol, dim=c(ncol,ncol))
 		AR.1 <- par_rho^abs(AR.1-t(AR.1));
-		sigma <- diag(sig_e^2, ncol) + sig_a^2 + sig_b^2*AR.1;
+		sigma <- diag(sig.e^2, ncol) + sig.a^2 + sig.b^2*AR.1;
 
-		par_cov <- par[ c(5:(4+NCOL(X))) ];
-		y.delt <- y.long - t( array( X %*% par_cov, dim=c(NCOL(y.long), NROW(y.long))))
-	
+		cov.effect <- par[ c(5:(4+NCOL(X))) ];
+		y.delt <- y.long - t( array( X %*% cov.effect, dim=c(NCOL(y.long), NROW(y.long))))
+
 		A <- 0;
 		if(any(is.na(y.delt)))
 		{
 			for(i in 1:NROW(y.delt) )
 			{
-				t.sel <- which( !is.na(c(y.time[i,]) ) );
+				t.sel <- which( !is.na(c(y.delt[i,]) ) & !is.na(c(y.time[i,]) ) );
 				sig <- sigma[t.sel, t.sel, drop=F];
 				A <- A + sum( dmvnorm( y.delt[i,t.sel,drop=F], rep(0, length(t.sel)), sig, log=T ) );
 			}
@@ -332,7 +364,7 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 	
 	est_par_cov<-function()
 	{
-		#1: rho, 2:sig_a, 3:sig_b, 4:sig_e
+		#1: rho, 2:sig.a, 3:sig.b, 4:sig.e
 		par.init <- c( 0.5, sd(y.long, na.rm=T)/3, sd(y.long, na.rm=T)/3, sd(y.long, na.rm=T)/3 );
 
 		if(intercept)
@@ -341,9 +373,9 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		for(i in 1:nCov)
 			par.init <- c( par.init, 1/( mean(y.cov[,i], na.rm=T)^2 + 1) );
 
-		if (y.cov.time>0)
+		if (time.cov>0)
 		{
-			par.init <- c( par.init, rep( 1/( mean(y.time, na.rm=T)^2 +1) , y.cov.time ) )
+			par.init <- c( par.init, rep( 1/( mean(y.time, na.rm=T)^2 +1) , time.cov ) )
 			if(is.null(y.time))
 				y.time <- t( t(ifelse(is.na(y.long),NA, 1))*(rep(1:NROW(y.long))))
 		}
@@ -352,20 +384,23 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 	}
 
 	# par[1] = rho
-	# par[2] = sig_a
-	# par[3] = sig_b
-	# par[4] = sig_e
+	# par[2] = sig.a
+	# par[3] = sig.b
+	# par[4] = sig.e
 	# par[5] = par_u
-	# par[6, 5+nCov] = par_cov
-	# par[6+nCov, (6:7+nCov) ] = par_cov_time
+	# par[6, 5+nCov] = cov.effect
+	# par[6+nCov, (6:7+nCov) ] = time.effect
 	# e.g.
-	# par.init <- c(rho=0.75, sig_a=0.2, sig_b=0.3, sig_e=0.1, u=1, a=0.5, b=0.5); 
+	# par.init <- c(rho=0.75, sig.a=0.2, sig.b=0.3, sig.e=0.1, u=1, a=0.5, b=0.5); 
 	
 	tolerance <- 1;
 	loop.n    <- 0;
 	min.val   <- Inf;
 	par.init  <- min.par <- est_par_cov();
-
+	
+	if(verbose)
+		cat("  Initial parameters:", par.init, "\n");
+	
 	while( loop.n <= g.maxiter && tolerance > 1e-5 )
 	{
 		r0 <- try( optim( par.init, get_par, y = y.long, y.time=y.time, y.cov=y.cov, method = "BFGS", control=list(maxit=500) ), silent = F );
@@ -381,7 +416,7 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		loop.n <- loop.n+1;
 		if ( r0$convergence==0 && r0$val<min.val)
 		{
-			if(debug) cat("  LOOP =", loop.n, "/", g.maxiter, " val=", r0$val,  "par=", r0$par, "\n");
+			if(verbose) cat("  LOOP =", loop.n, "/", g.maxiter, " val=", r0$val,  "par=", r0$par, "\n");
 			
 			tolerance <- max( c( min.val, par.init) - c(r0$value, r0$par) );
 			
@@ -393,7 +428,7 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 		par.init <- par.init*runif( length(par.init), 0.8, 1.2 );
 	}
 
-	if(debug) cat("  Final =", loop.n, " min.val=", min.val, "par=", min.par, "\n");
+	if(verbose) cat("  Final =", loop.n, " min.val=", min.val, "par=", min.par, "\n");
 	
 	if( is.infinite( min.val) || is.na(min.val) || any(is.na(min.par))  )
 		return( list(bSuccess=F) );
@@ -402,198 +437,44 @@ longskat_est_ML<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, intercept
 cat("SIG_A/B/E/R=", min.par[c(1:4)], "COV=", min.par[-c(1:4)], "LIKELIHOOD=", min.val, "\n"); 
 
 	par_rho <- min.par[1];
-	sig_a   <- abs(min.par[2]);
-	sig_b   <- abs(min.par[3]);
-	sig_e   <- abs(min.par[4]);
-	par_cov <- min.par[-c(1:4)];
+	sig.a   <- abs(min.par[2]);
+	sig.b   <- abs(min.par[3]);
+	sig.e   <- abs(min.par[4]);
+	cov.effect <- min.par[-c(1:4)];
 	par_mu  <- NA;
-	par_t   <- NA;
+	time.effect   <- NA;
 	
 	if(intercept)
 	{
-		par_mu  <- par_cov[1];
-		par_cov <- par_cov[-1];
+		par_mu  <- cov.effect[1];
+		cov.effect <- cov.effect[-1];
 	}
 	
-	if( y.cov.time > 0)
+	if( time.cov > 0)
 	{
-		par_t <- par_cov[-c(1:NCOL(y.cov))];
-		par_cov <- par_cov[ c(1:NCOL(y.cov))];
+		time.effect <- cov.effect[-c(1:NCOL(y.cov))];
+		cov.effect <- cov.effect[ c(1:NCOL(y.cov))];
 	}
 
 	y.delt <- y.long - t( array( X %*% min.par[-c(1:4)], dim=c(NCOL(y.long), NROW(y.long))))
 
 	pars <- list( intercept=intercept,
-				  y.cov.time = y.cov.time,
-			  	  mu     = par_mu, 
-			  	  rho    = par_rho, 
-			  	  sig_a  = sig_a, 
-			  	  sig_b  = sig_b, 
-			  	  sig_e  = sig_e, 
-			  	  par_cov= par_cov,  
-			  	  par_t  = par_t );  
+				  time.cov= time.cov,
+			  	  mu      = par_mu, 
+			  	  rho     = par_rho, 
+			  	  sig.a   = sig.a, 
+			  	  sig.b   = sig.b, 
+			  	  sig.e   = sig.e, 
+			  	  cov.effect  = cov.effect,  
+			  	  time.effect = time.effect );  
 
-	r.model <- list(par = pars, likelihood = min.val, y.delt=y.delt, y.time = y.time, y.cov = y.cov, bSuccess=T );
+	r.model <- list(par = pars, likelihood = min.val, 
+			phe.delt = y.delt, 
+			phe.time = y.time, 
+			phe.cov = y.cov, 
+			bSuccess=T );
 	
 	class(r.model) <- "LSKAT.null.model";
-
 	return(r.model);
 }
 
-longskat_est_model_LR_random<-function( y.long, y.cov, y.time = NULL, y.cov.time=0, g.maxiter=20, random.effect=NULL, init.par=list(), debug=F )
-{
-	# check id matched before call here!
-	
-	if(is.data.frame(y.long))  y.long <- data.matrix(y.long)
-	if(is.data.frame(y.cov))  y.cov <- data.matrix(y.cov)
-	if(is.data.frame(y.time)) y.time<- data.matrix(y.time)
-	
-	ncol <- NCOL(y.long);
-	nrow <- NROW(y.long);
-	nCov <- NCOL(y.cov);
-
-	if(is.null(random.effect))
-		u.mat <- array(0, dim=c(nrow, ncol))
-	else
-		u.mat <- as.matrix(random.effect);
-	
-	if( is.null(y.time))
-		y.time <- t(matrix(rep(c(1:ncol),nrow), nrow=ncol)) ;
-
-	X <-  kronecker(cbind(1, y.cov), rep(1, ncol) )
-	if( y.cov.time > 0 ) 
-		for(i in 1:y.cov.time)
-			X <- cbind(X, t(c(y.time))**i)	
-
-	X.i <- lapply(1:nrow, function(i){ 
-			YP<-t(y.long[i,,drop=F]); 
-			XP<-X[(i*ncol - ncol+1):(i * ncol),,drop=F]; 
-			return(XP[!is.na(YP),,drop=F])});
-	Y.i <- lapply(1:nrow, function(i){ 
-			YP<-t(y.long[i,,drop=F]); 
-			return(YP[!is.na(YP),1])});
-	U.i <- lapply(1:nrow, function(i){ 
-			YP <- t(y.long[i,,drop=F]); 
-			UP <- kronecker(u.mat[i,,drop=F], rep(1, ncol) )
-			return(UP[!is.na(YP),,drop=F])});
-	D.i <- lapply(1:nrow, function(i){ 
-			D <- array(1, dim=c(ncol(u.mat),ncol(u.mat)));
-			return(D);});
-			
-	RMEL<-function(sig_a, sig_b, sig_e, par_rho)
-	{
-		AR.1 <- array(1:ncol, dim=c(ncol,ncol))
-		AR.1 <- par_rho^abs(AR.1-t(AR.1));
-		E.i  <- diag(sig_e^2, ncol) + sig_a^2 + sig_b^2*AR.1;
-		
-		V_1 <- lapply(1:nrow, function(k) { solve( U.i[[k]] %*% D.i[[k]] %*% t(U.i[[k]]) + E.i )} );
-		XVX.i <- lapply(1:nrow, function(k){ t(X.i[[k]]) %*% V_1[[k]] %*% X.i[[k]]; });
-		XVX <- 0;
-		for(k in 1:nrow) XVX <- XVX + XVX.i[[k]];
-		
-		XVY.i <- lapply(1:nrow, function(k){ t(X.i[[k]]) %*% V_1[[k]] %*% Y.i[[k]]; });
-		XVY <- 0;
-		for(k in 1:nrow) XVY <- XVY + XVY.i[[k]];
-
-		
-		B <- solve(XVX) %*% XVY;
-		YXB <- lapply(1:nrow, function(k){ Y.i[[k]] - X.i[[k]]%*%B; });
-
-		Y.re <-  lapply(1:nrow, function(k){ t(YXB[[k]]) %*% V_1[[k]] %*% YXB[[k]]; }) ;		
-		
-		log.V.det <- lapply(1:nrow, function(k){ log(1/det(V_1[[k]]))});
-		LR <-  -0.5*(sum( unlist(log.V.det )) + sum(unlist(Y.re))) - 0.5*log(abs(det(XVX)))
-		
-		return(list(LR=LR, B=B, YXB=YXB));
-	}
-		
-	get_par<-function(par)
-	{	
-		sig_a <- abs(par[2]);
-		sig_b <- abs(par[3]);
-		sig_e <- abs(par[4]);
-		par_rho<- par[1];
-		if ( par_rho<0 || par_rho>=0.99 )
-			return(NaN);
-
-		r <- RMEL(sig_a, sig_b, sig_e, par_rho);
-		
-		return( -r$LR );
-	}
-
-	# par[1] = rho
-	# par[2] = sig_a
-	# par[3] = sig_b
-	# par[4] = sig_e
-	# e.g.
-	# par.init <- c(rho=0.75, sig_a=0.2, sig_b=0.3, sig_e=0.1 ); 
-
-	par.init <- c( 0.5, sd(y.long, na.rm=T), sd(y.long, na.rm=T), sd(y.long, na.rm=T) );
-
-	tolerance <- 1;
-	loop.n <- 0;
-	min.val <- Inf;
-	min.par <- par.init;
-
-	while( loop.n <= g.maxiter && tolerance > 1e-5 )
-	{
-		r0 <- try( optim( par.init, get_par, method = "BFGS", control=list(maxit=500) ), silent = F );
-
-		if (class(r0)=="try-error")
-		{
-			if (min.val >= 1e8)
-				loop.n <- loop.n + 0.2;
-			par.init <- min.par*runif( length(min.par) );
-			next;
-		}
-
-		loop.n <- loop.n+1;
-		if ( r0$convergence==0 && r0$val<min.val)
-		{
-			if(debug) cat("  LOOP =", loop.n, "/", g.maxiter, " val=", r0$val,  "par=", r0$par, "\n");
-			
-			tolerance <- max( c( min.val, par.init) - c(r0$value, r0$par) );
-			
-			min.val <- r0$value;
-			min.par <- r0$par;
-			par.init<- min.par;
-		}
-
-		par.init <- par.init*runif( length(par.init), 0.8, 1.2 );
-	}
-
-	if(debug) cat("  Final =", loop.n, " min.val=", min.val, "par=", min.par, "\n");
-	
-	if( is.infinite( min.val) || is.na(min.val) || any(is.na(min.par))  )
-		return( list(bSuccess=F) );
-
-	par_rho<- min.par[1]
-	sig_a  <- abs(min.par[2]);
-	sig_b  <- abs(min.par[3]);
-	sig_e  <- abs(min.par[4]);
-
-	LR <- RMEL(sig_a, sig_b, sig_e, par_rho);
-	
-cat("COV=", c(LR$B), "DELT=", range(LR$YXB), "\n"); 
-
-	par_cov <- c(LR$B);
-	par_mu  <- par_cov[1];
-	par_cov <- par_cov[-1];
-	par_t <- par_cov[-c(1:nCov)];
-
-	y.delt <- y.long - cbind(1,y.cov) %*% LR$B %*% rep(1, ncol);
-	
-	pars <- list( mu     = par_mu, 
-			  	  rho    = min.par[1], 
-			  	  sig_a  = sig_a, 
-			  	  sig_b  = sig_b, 
-			  	  sig_e  = sig_e, 
-		  	      par_cov= par_cov, 
-		  	      par_t  = par_t );
-
-	r.model <- list(par = pars, likelihood = min.val, y.cov.time=y.cov.time, y.delt=y.delt, y.time = y.time, y.cov = y.cov );
-	
-	class(r.model) <- "LSKAT.null.model";
-
-	return(r.model);
-}

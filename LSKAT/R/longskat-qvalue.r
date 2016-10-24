@@ -10,9 +10,7 @@ SKAT_davies <- function(q,lambda,h = rep(1,length(lambda)),delta = rep(0,length(
 	if (length(h) != r) stop("lambda and h should have the same length!")
 	if (length(delta) != r) stop("lambda and delta should have the same length!")
   
-	out <- c();
-	if ( require(SKAT) )
-		out <- .C("qfc",lambdas = as.double(lambda),
+	out <- .C("qfc",lambdas = as.double(lambda),
 				noncentral  = as.double(delta),
 				df          = as.integer(h),
 				r           = as.integer(r),
@@ -23,8 +21,6 @@ SKAT_davies <- function(q,lambda,h = rep(1,length(lambda)),delta = rep(0,length(
 				trace       = as.double(rep(0,7)),
 				ifault      = as.integer(0),
 				res         = as.double(0),PACKAGE="SKAT")
-	else
-		stop("SkAT package is necessary to install!");
   	
 	out$res <- 1 - out$res
   
@@ -197,15 +193,15 @@ SKAT_Scale_Genotypes <- function(X1, Z, weights.common=c(1,1), weights.rare=c(1,
 	Z.maf <- colMeans(Z)/2;
 
 	## NO common SNP, but Common.Only
-	if ( length ( which(Z.maf > rare.cutoff) )==0 && test.type == "Common.Only")
+	if ( length ( which(Z.maf > rare.cutoff) )==0 && toupper(test.type) == toupper("Common.Only"))
 		return(list(new=NULL, maf=NULL, rare=0))
 
 	## NO rare SNP, but Rare.Only
-	if ( length ( which(Z.maf <= rare.cutoff) )==0 && test.type == "Rare.Only")
+	if ( length ( which(Z.maf <= rare.cutoff) )==0 && toupper(test.type) == toupper("Rare.Only"))
 		return(list(new=NULL, maf=NULL, rare=0))
 
 	## only have common SNPs
-	if ( length ( which(Z.maf <= rare.cutoff) )==0 || test.type == "Common.Only")
+	if ( length ( which(Z.maf <= rare.cutoff) )==0 || toupper(test.type) == toupper("Common.Only"))
 	{
 		Z <- Z[, Z.maf > rare.cutoff, drop=F];
 		Z.maf <- colMeans(Z)/2;
@@ -217,7 +213,7 @@ SKAT_Scale_Genotypes <- function(X1, Z, weights.common=c(1,1), weights.rare=c(1,
 
 
 	## only have RARE SNPs
-	if ( length ( which(Z.maf > rare.cutoff) )==0 || test.type == "Rare.Only")
+	if ( length ( which(Z.maf > rare.cutoff) )==0 || toupper(test.type) == toupper("Rare.Only"))
 	{
 		Z <- Z[, Z.maf <= rare.cutoff, drop=F];
 		Z.maf <- colMeans(Z)/2;
