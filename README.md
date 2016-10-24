@@ -46,7 +46,7 @@ LSKAT is an R package which provides the main functions:
 
 > 1) NULL model estimation to estimate the model parameters and the residuals.
 
-> 2) Gene asscoiation test by LSKAT
+> 2) Gene association test by LSKAT
 
 > 3) LSKAT pipeline for PLINK data set with longitudial phenotype traits.
 
