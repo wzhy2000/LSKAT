@@ -20,7 +20,7 @@ longskat_gene_test <- function( r.model, snp.mat, weights.common=c(0.5,0.5), wei
 
 	snp.mat <- snp.mat[idx.snp,,drop=F];
 	snp.NMISS <- unlist(apply(snp.mat, 1, function(snp){length(which(is.na(snp)))}));
-	
+
 	if (any(is.na(colMeans(snp.mat)/2)))
 		snp.mat <- snp_impute( snp.mat, impute=snp.impute);
 
@@ -168,7 +168,7 @@ est_gen_Q.R<-function( par_null, X, Y.delt, Y.time, maf, Z, time.cov )
 	return(list(v=Q.v, w=Q.w, u=Q.u));
 }
 
-est_gen_Q<-function( par_null, X, Y.delt, Y.time, Z.scale.skat, Z.scale.burden, time.cov, run.cpp=T)
+est_gen_Q<-function( par_null, X, Y.delt, Y.time, Z.scale.skat, Z.scale.burden, time.cov, run.cpp=FALSE)
 {
 	t0 <- proc.time()
 	r.lskat<- list(v=0, w=0);
@@ -184,14 +184,15 @@ est_gen_Q<-function( par_null, X, Y.delt, Y.time, Z.scale.skat, Z.scale.burden, 
 						Z.scale.skat$new,
 						time.cov)
 		else
-			lskat<- .Call( "est_gen_Q_C",
-						as.vector( par_null*1.0),
-						as.matrix( X*1.0 ),
-						as.matrix( Y.delt*1.0 ),
-						as.matrix( Y.time*1.0 ),
-						as.vector( Z.scale.skat$maf*1.0),
-						as.matrix( Z.scale.skat$new*1.0),
-						time.cov);
+			stop("No binary libaray in current version, try run.cpp=FALSE");
+			#lskat<- .Call( "est_gen_Q_C",
+			#			as.vector( par_null*1.0),
+			#			as.matrix( X*1.0 ),
+			#			as.matrix( Y.delt*1.0 ),
+			#			as.matrix( Y.time*1.0 ),
+			#			as.vector( Z.scale.skat$maf*1.0),
+			#			as.matrix( Z.scale.skat$new*1.0),
+			#			time.cov);
 
 
 	r.burden<- list(v=0, w=0);
@@ -427,7 +428,7 @@ longskat_gene_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 		gene.idx <- match(gene.set, PF.gen$gen.list$names);
 		if( sum(!is.na(gene.idx))==0)
 			stop("All genes in the parameter 'gene.set' are available in current gene defintion file.\n");
-			
+
 		gene.set <- gene.idx[!is.na(gene.idx)];
 	}
 

@@ -23,7 +23,7 @@ To do ...
 Please install the required R package before you install LSKAT package. After the  installation of `SKAT`, `mvtnorm`, `snpStats` and `snowfall` package, please install the **LSKAT** as following steps.
 
  
-### Install LSKAT on LIUNX or Mac OSX
+### Install LSKAT on LUNIX or Mac OSX
 
 ```
 git clone https://github.com/ZWang-Lab/LSKAT.git
