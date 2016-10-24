@@ -56,13 +56,10 @@ In general, two ways are common to do data analysis by LSKAT, one is test the ge
 
 ```
 ## NULL model estimation
-
 r.nodel <- longskat_est_model( phe.long.matrix, phe.cov.matrix, phe.time.matrix);
 
 ## Gene association test
-
 r.lskat <- longskat_gene_test( r.model, snp.mat);
-
 ```
 
 Other way is to run LSKAT on whole PLINK data set using the pipeline provided by the function `longskat_gene_plink`
@@ -71,14 +68,6 @@ Other way is to run LSKAT on whole PLINK data set using the pipeline provided by
 ```
 r.lskat <- longskat_gene_plink( file.plink.bed,  file.plink.bim,  file.plink.fam,  
     file.phe.long,  file.phe.cov, NULL,  file.gene.set );
-
-
 ```
 
-All functions and examples in the LSKAT can be checked in the manual (https://github.com/ZWang-Lab/LSKAT/blob/master/manual.pdf).
-
-
-
-
-
-
+All functions and examples in the LSKAT are available in the manual (https://github.com/ZWang-Lab/LSKAT/blob/master/manual.pdf).
