@@ -20,7 +20,7 @@ To do ...
     
 3. PLINK 1.0 or 1.9 (https://www.cog-genomics.org/plink2)
 
-Please install the required R package before you install LSKAT package. After the  installation of `SKAT`, `mvtnorm`, `snpStats` and `snowfall` package, please install the #LSKAT# as following steps.
+Please install the required R package before you install LSKAT package. After the  installation of `SKAT`, `mvtnorm`, `snpStats` and `snowfall` package, please install the **LSKAT** as following steps.
 
  
 ### Install LSKAT on LIUNX or Mac OSX
