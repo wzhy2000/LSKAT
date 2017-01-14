@@ -156,6 +156,7 @@ get_gen_mat<-function( PF.gen, idx, impute="mean" )
 
 		nmiss <- apply(plink.org, 2, function(snp){sum(is.na(snp))});
 		snp.imp <- snp_impute(plink.org , impute=impute)
+		rownames(snp.imp) <- as.character(plink$fam$member);
 
 		return(list(maf=colMeans(snp.imp)/2, snp=snp.imp, nmiss=nmiss, info=map[,c(2,1,4)]) );
 	}

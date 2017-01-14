@@ -15,8 +15,7 @@ longskat_gene_plink(file.plink.bed,
     file.phe.time = NULL, 
     file.gene.set, 
     gene.set = NULL, 
-    options = list(),
-    verbose = FALSE)
+    options = list())
 }
 \arguments{
   \item{file.plink.bed}{File name, PLINK bed file}
@@ -28,7 +27,6 @@ longskat_gene_plink(file.plink.bed,
   \item{file.gene.set}{File name, indicating gene set table which has two columns, 1st column is gene name, 2nd column is variant name and no header. }
   \item{gene.set}{numeric or string. indicating the gene name or gene index in the gene set table.}
   \item{options}{String, see the details. }
-  \item{verbose}{Logical variable, indicating whether some debug information can be outputted. }
 }
 
 \details{
@@ -106,7 +104,7 @@ p0 <- longskat_gene_simulate( plink.format=T, file.plink.prefix="tmp-gene-plink"
 ## test all genes in the PLINK data set 
 r.lskat0 <- longskat_gene_plink(p0$file.plink.bed, p0$file.plink.bim, p0$file.plink.fam, 
       p0$file.phe.long, p0$file.phe.cov, NULL, 
-      p0$file.gene.set, gene.set=c(5:10), verbose=T );
+      p0$file.gene.set, gene.set=c(5:10), options=list(verbose=T) );
 
 ## print the results
 r.lskat0;

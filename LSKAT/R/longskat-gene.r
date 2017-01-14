@@ -16,7 +16,7 @@ longskat_gene_test <- function( r.model, snp.mat, weights.common=c(0.5,0.5), wei
 
 	idx.snp <- match(rownames(Y.delt), rownames(snp.mat))
 	if(length(which(is.na(idx.snp)))>0)
-		warning("Unconsistent Individual set between SNP matrix and NULL Model.");
+		stop("Unconsistent Individual set between SNP matrix and NULL Model.");
 
 	snp.mat <- snp.mat[idx.snp,,drop=F];
 	snp.NMISS <- unlist(apply(snp.mat, 1, function(snp){length(which(is.na(snp)))}));
@@ -271,7 +271,7 @@ longskat_gene_task<-function( r.model, PF.gen, PF.phe, gene, weights.common, wei
 			next;
 		}
 		else
-			if (verbose) cat("  Finding", NROW(gen$snp), "SNPs...\n");
+			if (verbose) cat("  Finding", NCOL(gen$snp), "SNPs...\n");
 
 		ls <- try( longskat_gene_test( r.model,
 						gen$snp,
@@ -287,6 +287,8 @@ longskat_gene_task<-function( r.model, PF.gen, PF.phe, gene, weights.common, wei
 
 		if(is.null(ls) || class(ls) == "try-error" )
 		{
+			snp.mat <-gen$snp;	
+			save(r.model, snp.mat, weights.common, weights.rare, file = tempfile( tmpdir=".", fileext=".failed.lskat.rdata") );
 			rs.lst[[rs.lst.idx]] <- c( i,
 						min(gen$info[,2]),
 						min(gen$info[,3]),
@@ -339,8 +341,7 @@ longskat_gene_plink<-function( file.plink.bed, file.plink.bim, file.plink.fam,
 				file.phe.time=NULL,
 				file.gene.set,
 				gene.set = NULL,
-				options=list(),
-				verbose=FALSE)
+				options=list() )
 {
 	cat( "[ LONGSKAT_GENE_PLINK ] Procedure.\n");
 	cat( "Checking the optional items......\n");
