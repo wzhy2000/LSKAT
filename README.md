@@ -36,7 +36,7 @@ R CMD INSTALL LSKAT
 
 ### Install LSKAT on Windows
 
-1) Please download windows package from (https://github.com/ZWang-Lab/LSKAT/blob/master/LSKAT-win.zip)
+1) Please download windows package from (https://github.com/wzhy2000/LSKAT/blob/master/windows/LSKAT_0.5.zip)
 
 2) Install the package in R GUI by selecting the menu "Packages|Install package(s) from local zip files..."
 
