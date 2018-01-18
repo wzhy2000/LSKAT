@@ -56,7 +56,7 @@ In general, two ways are common to do data analysis by LSKAT, one is test the ge
 
 ```
 ## NULL model estimation
-r.nodel <- longskat_est_model( phe.long.matrix, phe.cov.matrix, phe.time.matrix);
+r.model <- longskat_est_model( phe.long.matrix, phe.cov.matrix, phe.time.matrix);
 
 ## Gene association test
 r.lskat <- longskat_gene_test( r.model, snp.mat);
