@@ -26,7 +26,7 @@ Please install the required R package before you install LSKAT package. After th
 ### Install LSKAT on LUNIX or Mac OSX
 
 ```
-git clone https://github.com/ZWang-Lab/LSKAT.git
+git clone https://github.com/wzhy2000/LSKAT.git
 
 cd LSKAT
 
