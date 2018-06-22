@@ -152,7 +152,7 @@ simu_snp_mat<-function( min.sect, max.sect, n.sample, mat.count)
 				next;
 		}
 
-		snp.pair <- sample(1:(dim(snp.hap)[2]-2));
+		snp.pair <- sample(1:(dim(snp.hap)[1]-2));
 		snp.mat1 <- snp.hap[ snp.pair[1:n.sample], p.sel + 2 ];
 		snp.mat2 <- snp.hap[ snp.pair[(n.sample+1):(2*n.sample)], p.sel + 2 ];
 		snp.mat <- snp.mat1 + snp.mat2 -2;
